@@ -1,0 +1,23 @@
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+}
+
+#url-input {
+    width: 80%;
+    padding: 10px;
+    margin-top: 20px;
+}
+
+#search-button {
+    padding: 10px 20px;
+    margin-top: 20px;
+}
+
+#result img {
+    max-width: 100%;
+    height: auto;
+    margin-top: 10px;
+}
