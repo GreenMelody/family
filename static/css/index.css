@@ -16,8 +16,33 @@
     margin-top: 20px;
 }
 
-#result img {
-    max-width: 100%;
+.result-container {
+    margin-top: 30px;
+    text-align: left;
+}
+
+.product-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.product-details {
+    flex: 1;
+}
+
+.product-image {
+    flex: 0 0 150px;
+    text-align: right;
+}
+
+.product-image img {
+    max-width: 150px;
     height: auto;
-    margin-top: 10px;
+}
+
+.chart-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
 }
