@@ -2,6 +2,24 @@ from flask import Flask, render_template, request, jsonify
 import sqlite3
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, urlunparse
+import re
+
+# 화이트리스트 정의
+WHITELIST_DOMAINS = [
+    r'^example\.com$',      # 정확히 example.com만 허용
+    r'^.*\.example\.com$',  # example.com의 모든 하위 도메인 허용
+    r'^exp\.com$',          # 정확히 exp.com만 허용
+    r'^.*\.exp\.com$',      # exp.com의 모든 하위 도메인 허용
+]
+
+# 화이트리스트 확인 함수
+def is_url_allowed(url):
+    parsed_url = urlparse(url)
+    domain = parsed_url.netloc  # URL에서 도메인 추출
+    for pattern in WHITELIST_DOMAINS:
+        if re.match(pattern, domain):
+            return True
+    return False
 
 def normalize_url(url):
     parsed = urlparse(url)
@@ -27,6 +45,11 @@ def search_product():
     data = request.json
     raw_url = data.get('url')
     url = normalize_url(raw_url)  # URL 표준화 적용
+
+    # URL 화이트리스트 확인
+    if not is_url_allowed(url):
+        return jsonify({'exists': False, 'message': "허용되지 않은 URL입니다. 올바른 URL을 입력하세요."}), 400
+
     start_date = data.get('start_date')
     end_date = data.get('end_date')
 
@@ -64,12 +87,17 @@ def search_product():
 
 @app.route('/collect_data', methods=['POST'])
 def collect_data():
-    url = request.json.get('url')
+    raw_url = request.json.get('url')
+    url = normalize_url(raw_url)  # URL 표준화 적용
+
+    # URL 화이트리스트 확인
+    if not is_url_allowed(url):
+        return jsonify({'message': "허용되지 않은 URL입니다. 데이터를 수집할 수 없습니다."}), 400
+
     requested_at = datetime.now()
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # user_requests 테이블에 요청 데이터 삽입
     cursor.execute("INSERT INTO user_requests (url, requested_at, status) VALUES (?, ?, 'pending')", (url, requested_at))
     conn.commit()
     conn.close()
