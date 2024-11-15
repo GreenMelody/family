@@ -1,12 +1,78 @@
+// 날짜를 포맷팅하는 함수
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = ('0' + (date.getMonth() + 1)).slice(-2);
+    const day = ('0' + date.getDate()).slice(-2);
+    return `${year}-${month}-${day}`;
+}
+
+// 시작, 종료 날짜 초기화
+const today = new Date();
+const endDateInput = document.createElement('input');
+const startDateInput = document.createElement('input');
+endDateInput.type = startDateInput.type = 'date';
+endDateInput.value = formatDate(today);
+startDateInput.value = formatDate(new Date(today.setDate(today.getDate() - 15)));
+
+// 그래프를 그리는 함수
+function drawChart(labels, originalPrices, employeePrices) {
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '출고가',
+                    data: originalPrices,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    fill: false
+                },
+                {
+                    label: '임직원가',
+                    data: employeePrices,
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: '가격 변동 차트'
+                }
+            }
+        }
+    });
+}
+
+// 검색 버튼 클릭 이벤트
 document.getElementById('search-button').addEventListener('click', () => {
+    searchProduct();
+});
+
+// 날짜별 검색 버튼 클릭 이벤트
+document.getElementById('date-search-button').addEventListener('click', () => {
+    searchProduct();
+});
+
+// 상품 검색 및 차트 업데이트 함수
+function searchProduct() {
     const url = document.getElementById('url-input').value;
+    const startDate = document.getElementById('start-date') ? document.getElementById('start-date').value : startDateInput.value;
+    const endDate = document.getElementById('end-date') ? document.getElementById('end-date').value : endDateInput.value;
 
     fetch('/search', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: url }),
+        body: JSON.stringify({ url: url, start_date: startDate, end_date: endDate }),
     })
     .then(response => response.json())
     .then(data => {
@@ -27,50 +93,28 @@ document.getElementById('search-button').addEventListener('click', () => {
                         <img src="${product.image_url}" alt="Product Image" />
                     </div>
                 </div>
+                <div class="date-controls">
+                    <label>시작:</label>
+                    <input type="date" id="start-date" value="${startDate}">
+                    <label>종료:</label>
+                    <input type="date" id="end-date" value="${endDate}">
+                    <button id="date-search-button">검색</button>
+                </div>
                 <div class="chart-container">
                     <canvas id="priceChart"></canvas>
                 </div>
             `;
             resultDiv.innerHTML = productInfo;
 
-            // Chart.js를 이용해 가격 차트를 생성
+            document.getElementById('date-search-button').addEventListener('click', () => {
+                searchProduct();
+            });
+
             const labels = data.price_history.map(entry => entry.date);
             const originalPrices = data.price_history.map(entry => entry.original_price);
             const employeePrices = data.price_history.map(entry => entry.employee_price);
 
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: '출고가',
-                            data: originalPrices,
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            fill: false
-                        },
-                        {
-                            label: '임직원가',
-                            data: employeePrices,
-                            borderColor: 'rgba(153, 102, 255, 1)',
-                            fill: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        title: {
-                            display: true,
-                            text: '가격 변동 차트'
-                        }
-                    }
-                }
-            });
+            drawChart(labels, originalPrices, employeePrices);
         } else {
             if (confirm(data.message)) {
                 fetch('/collect_data', {
@@ -87,4 +131,4 @@ document.getElementById('search-button').addEventListener('click', () => {
             }
         }
     });
-});
+}

@@ -1,2 +1,4 @@
 *.db
 samples.py
+collect_files.py
+recent_code.txt
