@@ -1,6 +1,15 @@
 from flask import Flask, render_template, request, jsonify
 import sqlite3
 from datetime import datetime, timedelta
+from urllib.parse import urlparse, urlunparse
+
+def normalize_url(url):
+    parsed = urlparse(url)
+    scheme = parsed.scheme or 'http'  # 스킴이 없으면 기본값으로 'http' 사용
+    netloc = parsed.netloc or parsed.path.split('/')[0]
+    path = parsed.path if parsed.netloc else '/' + '/'.join(parsed.path.split('/')[1:])
+    normalized = urlunparse((scheme, netloc, path, '', '', ''))
+    return normalized.rstrip('/')  # 마지막 '/' 제거
 
 app = Flask(__name__)
 
@@ -16,7 +25,8 @@ def index():
 @app.route('/search', methods=['POST'])
 def search_product():
     data = request.json
-    url = data.get('url')
+    raw_url = data.get('url')
+    url = normalize_url(raw_url)  # URL 표준화 적용
     start_date = data.get('start_date')
     end_date = data.get('end_date')
 
