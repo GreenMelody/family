@@ -56,11 +56,6 @@ document.getElementById('search-button').addEventListener('click', () => {
     searchProduct();
 });
 
-// 날짜별 검색 버튼 클릭 이벤트
-document.getElementById('date-search-button').addEventListener('click', () => {
-    searchProduct();
-});
-
 // 상품 검색 및 차트 업데이트 함수
 function searchProduct() {
     const url = document.getElementById('url-input').value;
@@ -106,6 +101,7 @@ function searchProduct() {
             `;
             resultDiv.innerHTML = productInfo;
 
+            // date-search-button이 생성된 이후 이벤트 리스너 등록
             document.getElementById('date-search-button').addEventListener('click', () => {
                 searchProduct();
             });
