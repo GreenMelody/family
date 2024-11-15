@@ -38,6 +38,12 @@ def create_tables():
             status VARCHAR(50) DEFAULT 'pending'
         );
     ''')
+# pending: 요청 대기 상태.
+# in_progress: 처리 중.
+# completed: 성공적으로 처리 완료.
+# failed: 요청 실패.
+# rejected: 허용되지 않은 요청.
+
 
     # product_hits 테이블 생성
     cursor.execute('''
