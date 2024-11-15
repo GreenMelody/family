@@ -29,6 +29,18 @@ def normalize_url(url):
     normalized = urlunparse((scheme, netloc, path, '', '', ''))
     return normalized.rstrip('/')  # 마지막 '/' 제거
 
+def validate_url_or_reject(url, cursor):
+    normalized_url = normalize_url(url)
+    if not is_url_allowed(normalized_url):
+        # 허용되지 않는 URL은 user_requests에 rejected로 기록
+        requested_at = datetime.now()
+        cursor.execute('''
+            INSERT INTO user_requests (url, requested_at, status)
+            VALUES (?, ?, 'rejected')
+        ''', (normalized_url, requested_at))
+        return False, "허용되지 않은 URL입니다."
+    return True, normalized_url
+
 app = Flask(__name__)
 
 def get_db_connection():
@@ -44,22 +56,36 @@ def index():
 def search_product():
     data = request.json
     raw_url = data.get('url')
-    url = normalize_url(raw_url)  # URL 표준화 적용
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    valid, result = validate_url_or_reject(raw_url, cursor)
+    if not valid:
+        conn.commit()
+        conn.close()
+        return jsonify({'exists': False, 'message': result}), 400
 
-    # URL 화이트리스트 확인
-    if not is_url_allowed(url):
-        return jsonify({'exists': False, 'message': "허용되지 않은 URL입니다. 올바른 URL을 입력하세요."}), 400
-
+    url = result  # 정상화된 URL
     start_date = data.get('start_date')
     end_date = data.get('end_date')
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
+    # DB에서 데이터 조회
     cursor.execute("SELECT * FROM product WHERE url = ?", (url,))
     product = cursor.fetchone()
 
     if product:
+        # product 데이터를 JSON 직렬화 가능한 형태로 변환
+        product_data = {
+            'product_id': product['product_id'],
+            'name': product['name'],
+            'model': product['model'],
+            'options': product['options'],
+            'url': product['url'],
+            'image_url': product['image_url']
+        }
+
+        # price_history 데이터 조회 및 변환
         cursor.execute('''
             SELECT date, original_price, employee_price 
             FROM price_history 
@@ -67,19 +93,18 @@ def search_product():
             ORDER BY date
         ''', (product['product_id'], start_date, end_date))
         price_history = cursor.fetchall()
+
+        price_history_data = [
+            {'date': row['date'], 'original_price': row['original_price'], 'employee_price': row['employee_price']}
+            for row in price_history
+        ]
+
         conn.close()
 
         return jsonify({
             'exists': True,
-            'product': {
-                'product_id': product['product_id'],
-                'name': product['name'],
-                'model': product['model'],
-                'options': product['options'],
-                'url': product['url'],
-                'image_url': product['image_url']
-            },
-            'price_history': [{'date': row['date'], 'original_price': row['original_price'], 'employee_price': row['employee_price']} for row in price_history]
+            'product': product_data,
+            'price_history': price_history_data
         })
     else:
         conn.close()
@@ -88,20 +113,27 @@ def search_product():
 @app.route('/collect_data', methods=['POST'])
 def collect_data():
     raw_url = request.json.get('url')
-    url = normalize_url(raw_url)  # URL 표준화 적용
 
-    # URL 화이트리스트 확인
-    if not is_url_allowed(url):
-        return jsonify({'message': "허용되지 않은 URL입니다. 데이터를 수집할 수 없습니다."}), 400
-
-    requested_at = datetime.now()
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    valid, result = validate_url_or_reject(raw_url, cursor)
+    if not valid:
+        conn.commit()
+        conn.close()
+        return jsonify({'message': result}), 400
 
-    cursor.execute("INSERT INTO user_requests (url, requested_at, status) VALUES (?, ?, 'pending')", (url, requested_at))
+    url = result  # 정상화된 URL
+
+    # 데이터 수집 요청 기록
+    requested_at = datetime.now()
+    cursor.execute('''
+        INSERT INTO user_requests (url, requested_at, status)
+        VALUES (?, ?, 'pending')
+    ''', (url, requested_at))
     conn.commit()
     conn.close()
-    
+
     return jsonify({'message': '데이터 수집 요청이 성공적으로 접수되었습니다.'})
 
 if __name__ == '__main__':
