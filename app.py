@@ -56,10 +56,10 @@ def index():
 def search_product():
     data = request.json
     raw_url = data.get('url')
-    
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     valid, result = validate_url_or_reject(raw_url, cursor)
     if not valid:
         conn.commit()
@@ -70,12 +70,41 @@ def search_product():
     start_date = data.get('start_date')
     end_date = data.get('end_date')
 
-    # DB에서 데이터 조회
+    # 상태와 요청 시간 조회
+    cursor.execute('''
+        SELECT status, requested_at 
+        FROM user_requests 
+        WHERE url = ? 
+        ORDER BY requested_at DESC
+        LIMIT 1
+    ''', (url,))
+    request_info = cursor.fetchone()
+
+    status_message = None
+    if request_info:
+        status, requested_at = request_info['status'], request_info['requested_at']
+        try:
+            requested_date = datetime.strptime(requested_at, "%Y-%m-%d %H:%M:%S.%f").date().strftime('%Y년 %m월 %d일')
+        except ValueError:  # 마이크로초가 없는 경우 처리
+            requested_date = datetime.strptime(requested_at, "%Y-%m-%d %H:%M:%S").date().strftime('%Y년 %m월 %d일')
+
+        if status == 'pending':
+            status_message = f"{requested_date}에 수집 요청 받아 데이터 수집 대기 중인 URL입니다."
+        elif status == 'in_progress':
+            status_message = f"{requested_date}부터 데이터 수집 중인 URL입니다."
+        elif status == 'completed':
+            status_message = f"{requested_date}에 데이터 수집이 완료된 URL입니다."
+        elif status == 'failed':
+            status_message = f"{requested_date}에 데이터 수집이 실패한 URL입니다."
+        elif status == 'rejected':
+            status_message = f"{requested_date}에 허용되지 않은 URL로 수집 요청이 거부된 URL입니다."
+
+    # 제품 데이터 조회
     cursor.execute("SELECT * FROM product WHERE url = ?", (url,))
     product = cursor.fetchone()
 
     if product:
-        # product 데이터를 JSON 직렬화 가능한 형태로 변환
+        # 제품 데이터가 있으면 반환
         product_data = {
             'product_id': product['product_id'],
             'name': product['name'],
@@ -85,7 +114,6 @@ def search_product():
             'image_url': product['image_url']
         }
 
-        # price_history 데이터 조회 및 변환
         cursor.execute('''
             SELECT date, original_price, employee_price 
             FROM price_history 
@@ -104,11 +132,16 @@ def search_product():
         return jsonify({
             'exists': True,
             'product': product_data,
-            'price_history': price_history_data
+            'price_history': price_history_data,
+            'status_message': status_message
         })
     else:
         conn.close()
-        return jsonify({'exists': False, 'message': "현재 해당 url에 대한 데이터가 없습니다. 해당 url에 대한 데이터를 수집하시겠습니까?"})
+        return jsonify({
+            'exists': False,
+            'message': "현재 해당 url에 대한 데이터가 없습니다. 해당 url에 대한 데이터를 수집하시겠습니까?",
+            'status_message': status_message
+        })
 
 @app.route('/collect_data', methods=['POST'])
 def collect_data():

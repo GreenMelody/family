@@ -65,6 +65,7 @@ document.getElementById('url-input').addEventListener('keypress', (event) => {
 });
 
 // 상품 검색 및 차트 업데이트 함수
+// 상품 검색 및 차트 업데이트 함수
 function searchProduct() {
     const url = document.getElementById('url-input').value;
     const startDate = document.getElementById('start-date') ? document.getElementById('start-date').value : startDateInput.value;
@@ -80,7 +81,14 @@ function searchProduct() {
     .then(response => response.json())
     .then(data => {
         const resultDiv = document.getElementById('result');
+        const statusMessageDiv = document.getElementById('status-message');
         resultDiv.innerHTML = '';
+        statusMessageDiv.innerHTML = '';
+
+        // 상태 메시지 업데이트
+        if (data.status_message) {
+            statusMessageDiv.textContent = data.status_message;
+        }
 
         if (data.exists) {
             const product = data.product;
