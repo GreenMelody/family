@@ -113,10 +113,11 @@ def search_product():
 @app.route('/collect_data', methods=['POST'])
 def collect_data():
     raw_url = request.json.get('url')
+    url = normalize_url(raw_url)  # URL 표준화 적용
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     valid, result = validate_url_or_reject(raw_url, cursor)
     if not valid:
         conn.commit()
@@ -124,6 +125,16 @@ def collect_data():
         return jsonify({'message': result}), 400
 
     url = result  # 정상화된 URL
+
+    # URL 중복 확인
+    cursor.execute('''
+        SELECT * FROM user_requests WHERE url = ? AND status = 'pending'
+    ''', (url,))
+    existing_request = cursor.fetchone()
+
+    if existing_request:
+        conn.close()
+        return jsonify({'message': '이미 수집 대기 중인 URL입니다.'}), 200
 
     # 데이터 수집 요청 기록
     requested_at = datetime.now()
