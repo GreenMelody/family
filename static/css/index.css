@@ -60,3 +60,12 @@
     padding: 5px 10px;
     font-size: 14px;
 }
+
+.product-image img {
+    max-width: 150px; /* 너비 최대값 */
+    max-height: 150px; /* 높이 최대값 */
+    object-fit: contain; /* 이미지 비율 유지 */
+    border: 1px solid #ddd; /* 선택적 테두리 */
+    border-radius: 5px; /* 선택적 테두리 둥글게 */
+    padding: 5px; /* 선택적 여백 */
+}
