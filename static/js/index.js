@@ -56,6 +56,14 @@ document.getElementById('search-button').addEventListener('click', () => {
     searchProduct();
 });
 
+// URL 입력창에서 엔터키를 눌렀을 때 검색
+document.getElementById('url-input').addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+        event.preventDefault(); // 기본 폼 제출 방지
+        document.getElementById('search-button').click(); // 검색 버튼 클릭 트리거
+    }
+});
+
 // 상품 검색 및 차트 업데이트 함수
 function searchProduct() {
     const url = document.getElementById('url-input').value;
