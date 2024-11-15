@@ -35,9 +35,7 @@ def create_tables():
             request_id INTEGER PRIMARY KEY AUTOINCREMENT,
             url VARCHAR(255) NOT NULL,
             requested_at DATETIME NOT NULL,
-            status VARCHAR(50) DEFAULT 'pending',
-            total_hits INTEGER DEFAULT 0,
-            hits INTEGER DEFAULT 0
+            status VARCHAR(50) DEFAULT 'pending'
         );
     ''')
 
