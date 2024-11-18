@@ -1,9 +1,15 @@
 from flask import Flask, request, jsonify, render_template
 import sqlite3
 from datetime import datetime
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 DATABASE = "product_data.db"
+
+API_KEY = "your_shared_secret_key"
+
+# 허용된 도메인 설정
+ALLOWED_DOMAIN = "www.example.com"
 
 # 데이터베이스 연결 함수
 def get_db_connection():
@@ -11,27 +17,40 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row  # Row 객체로 반환
     return conn
 
-# 허용된 도메인 설정
-ALLOWED_DOMAIN = "www.example.com"
+# URL 유효성 검사
+def validate_and_format_url(input_url):
+    if not input_url.strip():
+        return {"valid": False, "message": "상품 페이지 URL을 입력해주세요."}
+
+    # URL이 http:// 또는 https://로 시작하지 않을 경우 https:// 추가
+    if not input_url.startswith(("http://", "https://")):
+        input_url = "https://" + input_url
+
+    # URL 파싱
+    parsed_url = urlparse(input_url)
+
+    # 도메인 검사
+    if parsed_url.netloc != ALLOWED_DOMAIN:
+        return {"valid": False, "message": f"올바르지 않은 도메인입니다. {ALLOWED_DOMAIN}의 상품 페이지 URL을 입력해주세요."}
+
+    return {"valid": True, "url": input_url}
 
 # 기본 페이지 렌더링
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# URL 유효성 검사 및 포맷 변환 함수
-def validate_and_format_url(input_url):
-    if not input_url.strip():
-        return {"valid": False, "message": "상품 페이지 URL을 입력해주세요."}
+@app.before_request
+def verify_api_key():
+    # static 파일 요청 및 일반 사용자 웹 요청은 제외
+    if request.endpoint in ["index", "static"]:
+        return
 
-    if not input_url.startswith(("http://", "https://")):
-        input_url = "https://" + input_url
-
-    parsed_url = request.url_adapter.match(input_url)
-    if ALLOWED_DOMAIN not in parsed_url.netloc:
-        return {"valid": False, "message": f"올바르지 않은 도메인입니다. {ALLOWED_DOMAIN}의 상품 페이지 URL을 입력해주세요."}
-
-    return {"valid": True, "url": parsed_url}
+    # API 요청에만 API 키 검증
+    if request.endpoint.startswith("api"):
+        api_key = request.headers.get("API-Key")
+        if api_key != API_KEY:
+            return jsonify({"error": "Invalid API Key"}), 403
 
 # URL 상태 확인 API
 @app.route("/api/url-status", methods=["GET"])
@@ -40,11 +59,17 @@ def url_status():
     if not url:
         return jsonify({"status": "error", "message": "URL을 입력해주세요."}), 400
 
+    validation_result = validate_and_format_url(url)
+    if not validation_result["valid"]:
+        return jsonify({"status": "error", "message": validation_result["message"]}), 400
+
+    formatted_url = validation_result["url"]
+
     conn = get_db_connection()
     cur = conn.cursor()
 
     # URL 데이터 가져오기
-    cur.execute("SELECT * FROM url WHERE url = ?", (url,))
+    cur.execute("SELECT * FROM url WHERE url = ?", (formatted_url,))
     url_row = cur.fetchone()
     if not url_row:
         return jsonify({"status": "error", "message": "해당 URL은 데이터베이스에 존재하지 않습니다."}), 404
@@ -73,8 +98,38 @@ def url_status():
             "product_url": url_row["url"],
             "prices": prices
         })
+    elif url_row["status"] == "inactive":
+        # inactive 상태에서 이전 데이터를 반환
+        cur.execute("""
+            SELECT * FROM product WHERE url_id = ?
+        """, (url_row["url_id"],))
+        product = cur.fetchone()
 
-    return jsonify({"status": "pending", "message": "해당 URL은 수집 대기 중입니다."})
+        cur.execute("""
+            SELECT date_recorded AS date, release_price, employee_price
+            FROM price_history WHERE product_id = ?
+            ORDER BY date_recorded
+        """, (product["product_id"],))
+        prices = [dict(row) for row in cur.fetchall()]
+
+        conn.close()
+        return jsonify({
+            "status": "inactive",
+            "message": "해당 URL은 3일 이상 데이터 수집이 정상적이지 않아 더 이상 업데이트 되지 않습니다. 이전 데이터만 확인이 가능합니다.",
+            "product_name": product["product_name"],
+            "prices": prices,
+            "image_url": product["image_url"],
+            "model_name": product["model_name"],
+            "options": product["options"],
+            "product_url": url_row["url"]
+        })
+
+    elif url_row["status"] == "pending":
+        conn.close()
+        return jsonify({
+            "status": "pending",
+            "message": "해당 URL은 데이터 수집 대기 중입니다."
+        })
 
 # URL 데이터 요청 API (날짜 범위)
 @app.route("/api/url-data", methods=["GET"])
@@ -153,8 +208,8 @@ def crawl_result():
         error_message = result.get("error_message")
         data = result.get("data")
 
-        # 크롤링 성공 처리
         if status == "Success":
+            # 성공 처리
             product_name = data["product_name"]
             model_name = data["model_name"]
             image_url = data["image_url"]
@@ -174,11 +229,33 @@ def crawl_result():
                 VALUES ((SELECT product_id FROM product WHERE url_id = ?), DATE('now'), ?, ?)
             """, (url_id, release_price, employee_price))
 
-        # 크롤링 실패 처리
-        cur.execute("""
-            INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
-            VALUES (?, DATETIME('now'), ?, ?)
-        """, (url_id, status, error_message))
+            # 실패 횟수 초기화 및 마지막 시도 시간 갱신
+            cur.execute("""
+                UPDATE url
+                SET fail_count = 0, last_attempt = DATETIME('now')
+                WHERE url_id = ?
+            """, (url_id,))
+
+        elif status == "Failed":
+            # 실패 처리: 실패 횟수 증가 및 마지막 시도 시간 갱신
+            cur.execute("""
+                UPDATE url
+                SET fail_count = fail_count + 1, last_attempt = DATETIME('now')
+                WHERE url_id = ?
+            """, (url_id,))
+
+            # 크롤링 실패 기록
+            cur.execute("""
+                INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
+                VALUES (?, DATETIME('now'), 'Failed', ?)
+            """, (url_id, error_message))
+
+            # 실패 횟수가 3 이상이고 최근 3일 동안 실패한 경우 inactive 상태로 변경
+            cur.execute("""
+                UPDATE url
+                SET status = 'inactive'
+                WHERE url_id = ? AND fail_count >= 3 AND last_attempt <= DATETIME('now', '-3 days')
+            """, (url_id,))
 
     conn.commit()
     conn.close()

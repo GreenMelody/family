@@ -90,14 +90,15 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function updateGraph(prices) {
+    const resultDiv = document.getElementById("result");
     if (!prices || prices.length === 0) {
-        alert("표시할 데이터가 없습니다.");
+        resultDiv.innerHTML += "<p>표시할 데이터가 없습니다.</p>";
         return;
     }
 
     const ctx = document.getElementById("priceChart").getContext("2d");
 
-    // 초기화: 기존 차트가 있으면 제거
+    // 기존 차트 초기화
     if (window.priceChart && typeof window.priceChart.destroy === "function") {
         window.priceChart.destroy();
     }
@@ -113,21 +114,19 @@ function updateGraph(prices) {
                     data: prices.map((price) => price.release_price),
                     borderColor: "blue",
                     borderWidth: 2,
-                    fill: false,
                 },
                 {
                     label: "임직원가",
                     data: prices.map((price) => price.employee_price),
                     borderColor: "green",
                     borderWidth: 2,
-                    fill: false,
                 },
             ],
         },
         options: {
             responsive: true,
             plugins: {
-                legend: { display: true, position: "top" },
+                legend: { display: true },
             },
             scales: {
                 x: { title: { display: true, text: "날짜" } },
@@ -135,8 +134,6 @@ function updateGraph(prices) {
             },
         },
     });
-
-    console.log("새 차트가 성공적으로 생성되었습니다.");
 }
 
 function updateTable(prices) {

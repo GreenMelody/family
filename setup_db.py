@@ -10,8 +10,10 @@ cur.execute("""
 CREATE TABLE IF NOT EXISTS url (
     url_id INTEGER PRIMARY KEY AUTOINCREMENT,
     url TEXT UNIQUE NOT NULL,
-    status TEXT CHECK(status IN ('active', 'inactive')) NOT NULL DEFAULT 'active',
-    added_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    status TEXT CHECK(status IN ('active', 'inactive', 'pending')) NOT NULL DEFAULT 'active',
+    added_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fail_count INTEGER DEFAULT 0, -- 실패 횟수 기록
+    last_attempt DATETIME         -- 마지막 시도 시간
 );
 """)
 

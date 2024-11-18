@@ -131,3 +131,15 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(1)
+
+
+# 인증 추가
+# API_KEY = "your_shared_secret_key"
+
+# def get_url_list_from_a_server():
+#     headers = {"API-Key": API_KEY}
+#     response = requests.get("http://A_SERVER_ADDRESS/api/url-list", headers=headers)
+#     if response.status_code == 403:
+#         print("API Key 인증 실패")
+#         return None
+#     return response.json()
