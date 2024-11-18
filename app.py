@@ -1,184 +1,188 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import sqlite3
-from datetime import datetime, timedelta
-from urllib.parse import urlparse, urlunparse
-import re
-
-# 화이트리스트 정의
-WHITELIST_DOMAINS = [
-    r'^example\.com$',      # 정확히 example.com만 허용
-    r'^.*\.example\.com$',  # example.com의 모든 하위 도메인 허용
-    r'^exp\.com$',          # 정확히 exp.com만 허용
-    r'^.*\.exp\.com$',      # exp.com의 모든 하위 도메인 허용
-]
-
-# 화이트리스트 확인 함수
-def is_url_allowed(url):
-    parsed_url = urlparse(url)
-    domain = parsed_url.netloc  # URL에서 도메인 추출
-    for pattern in WHITELIST_DOMAINS:
-        if re.match(pattern, domain):
-            return True
-    return False
-
-def normalize_url(url):
-    parsed = urlparse(url)
-    scheme = parsed.scheme or 'http'  # 스킴이 없으면 기본값으로 'http' 사용
-    netloc = parsed.netloc or parsed.path.split('/')[0]
-    path = parsed.path if parsed.netloc else '/' + '/'.join(parsed.path.split('/')[1:])
-    normalized = urlunparse((scheme, netloc, path, '', '', ''))
-    return normalized.rstrip('/')  # 마지막 '/' 제거
-
-def validate_url_or_reject(url, cursor):
-    normalized_url = normalize_url(url)
-    if not is_url_allowed(normalized_url):
-        # 허용되지 않는 URL은 user_requests에 rejected로 기록
-        requested_at = datetime.now()
-        cursor.execute('''
-            INSERT INTO user_requests (url, requested_at, status)
-            VALUES (?, ?, 'rejected')
-        ''', (normalized_url, requested_at))
-        return False, "허용되지 않은 URL입니다."
-    return True, normalized_url
+from datetime import datetime
 
 app = Flask(__name__)
+DATABASE = "product_data.db"
 
+# 데이터베이스 연결 함수
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
-    conn.row_factory = sqlite3.Row
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row  # Row 객체로 반환
     return conn
 
-@app.route('/')
+# 허용된 도메인 설정
+ALLOWED_DOMAIN = "www.example.com"
+
+# 기본 페이지 렌더링
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/search', methods=['POST'])
-def search_product():
-    data = request.json
-    raw_url = data.get('url')
+# URL 유효성 검사 및 포맷 변환 함수
+def validate_and_format_url(input_url):
+    if not input_url.strip():
+        return {"valid": False, "message": "상품 페이지 URL을 입력해주세요."}
+
+    if not input_url.startswith(("http://", "https://")):
+        input_url = "https://" + input_url
+
+    parsed_url = request.url_adapter.match(input_url)
+    if ALLOWED_DOMAIN not in parsed_url.netloc:
+        return {"valid": False, "message": f"올바르지 않은 도메인입니다. {ALLOWED_DOMAIN}의 상품 페이지 URL을 입력해주세요."}
+
+    return {"valid": True, "url": parsed_url}
+
+# URL 상태 확인 API
+@app.route("/api/url-status", methods=["GET"])
+def url_status():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"status": "error", "message": "URL을 입력해주세요."}), 400
 
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    valid, result = validate_url_or_reject(raw_url, cursor)
-    if not valid:
-        conn.commit()
-        conn.close()
-        return jsonify({'exists': False, 'message': result}), 400
+    # URL 데이터 가져오기
+    cur.execute("SELECT * FROM url WHERE url = ?", (url,))
+    url_row = cur.fetchone()
+    if not url_row:
+        return jsonify({"status": "error", "message": "해당 URL은 데이터베이스에 존재하지 않습니다."}), 404
 
-    url = result  # 정상화된 URL
-    start_date = data.get('start_date')
-    end_date = data.get('end_date')
+    if url_row["status"] == "active":
+        # 상품 데이터 가져오기
+        cur.execute("SELECT * FROM product WHERE url_id = ?", (url_row["url_id"],))
+        product = cur.fetchone()
 
-    # 상태와 요청 시간 조회
-    cursor.execute('''
-        SELECT status, requested_at 
-        FROM user_requests 
-        WHERE url = ? 
-        ORDER BY requested_at DESC
-        LIMIT 1
-    ''', (url,))
-    request_info = cursor.fetchone()
-
-    status_message = None
-    if request_info:
-        status, requested_at = request_info['status'], request_info['requested_at']
-        try:
-            requested_date = datetime.strptime(requested_at, "%Y-%m-%d %H:%M:%S.%f").date().strftime('%Y년 %m월 %d일')
-        except ValueError:  # 마이크로초가 없는 경우 처리
-            requested_date = datetime.strptime(requested_at, "%Y-%m-%d %H:%M:%S").date().strftime('%Y년 %m월 %d일')
-
-        if status == 'pending':
-            status_message = f"{requested_date}에 수집 요청 받아 데이터 수집 대기 중인 URL입니다."
-        elif status == 'in_progress':
-            status_message = f"{requested_date}부터 데이터 수집 중인 URL입니다."
-        elif status == 'completed':
-            status_message = f"{requested_date}에 데이터 수집이 완료된 URL입니다."
-        elif status == 'failed':
-            status_message = f"{requested_date}에 데이터 수집이 실패한 URL입니다."
-        elif status == 'rejected':
-            status_message = f"{requested_date}에 허용되지 않은 URL로 수집 요청이 거부된 URL입니다."
-
-    # 제품 데이터 조회
-    cursor.execute("SELECT * FROM product WHERE url = ?", (url,))
-    product = cursor.fetchone()
-
-    if product:
-        # 제품 데이터가 있으면 반환
-        product_data = {
-            'product_id': product['product_id'],
-            'name': product['name'],
-            'model': product['model'],
-            'options': product['options'],
-            'url': product['url'],
-            'image_url': product['image_url']
-        }
-
-        cursor.execute('''
-            SELECT date, original_price, employee_price 
-            FROM price_history 
-            WHERE product_id = ? AND date BETWEEN ? AND ?
-            ORDER BY date
-        ''', (product['product_id'], start_date, end_date))
-        price_history = cursor.fetchall()
-
-        price_history_data = [
-            {'date': row['date'], 'original_price': row['original_price'], 'employee_price': row['employee_price']}
-            for row in price_history
-        ]
+        # 가격 데이터 가져오기
+        cur.execute("""
+            SELECT date_recorded AS date, release_price, employee_price
+            FROM price_history WHERE product_id = ?
+            ORDER BY date_recorded
+        """, (product["product_id"],))
+        prices = [dict(row) for row in cur.fetchall()]
 
         conn.close()
-
         return jsonify({
-            'exists': True,
-            'product': product_data,
-            'price_history': price_history_data,
-            'status_message': status_message
+            "status": "active",
+            "start_date": url_row["added_date"],
+            "product_name": product["product_name"],
+            "image_url": product["image_url"],
+            "model_name": product["model_name"],
+            "options": product["options"],
+            "product_url": url_row["url"],
+            "prices": prices
         })
+
+    return jsonify({"status": "pending", "message": "해당 URL은 수집 대기 중입니다."})
+
+# URL 데이터 요청 API (날짜 범위)
+@app.route("/api/url-data", methods=["GET"])
+def url_data():
+    url = request.args.get("url")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # URL에 해당하는 product_id 찾기
+    cur.execute("""
+        SELECT product_id FROM product
+        WHERE url_id = (SELECT url_id FROM url WHERE url = ?)
+    """, (url,))
+    product_row = cur.fetchone()
+
+    if not product_row:
+        conn.close()
+        return jsonify({"status": "error", "message": "URL에 해당하는 상품을 찾을 수 없습니다."}), 404
+
+    product_id = product_row["product_id"]
+
+    # 가격 데이터 가져오기
+    cur.execute("""
+        SELECT date_recorded AS date, release_price, employee_price
+        FROM price_history
+        WHERE product_id = ? AND date_recorded BETWEEN ? AND ?
+        ORDER BY date_recorded
+    """, (product_id, start_date, end_date))
+    prices = [dict(row) for row in cur.fetchall()]
+
+    conn.close()
+    return jsonify({"status": "success", "prices": prices})
+
+# B 서버: URL 리스트 제공
+@app.route("/api/url-list", methods=["GET"])
+def url_list():
+    type_param = request.args.get("type", "all")
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if type_param == "retry":
+        # 실패한 URL 가져오기
+        cur.execute("""
+            SELECT url_id, url
+            FROM url
+            WHERE status = 'active'
+              AND url_id IN (
+                  SELECT url_id
+                  FROM crawl_log
+                  WHERE status = 'Failed'
+                  GROUP BY url_id
+                  HAVING COUNT(*) >= 1
+              )
+        """)
     else:
-        conn.close()
-        return jsonify({
-            'exists': False,
-            'message': "현재 해당 url에 대한 데이터가 없습니다. 해당 url에 대한 데이터를 수집하시겠습니까?",
-            'status_message': status_message
-        })
+        # 전체 URL 가져오기
+        cur.execute("SELECT url_id, url FROM url WHERE status = 'active'")
 
-@app.route('/collect_data', methods=['POST'])
-def collect_data():
-    raw_url = request.json.get('url')
-    url = normalize_url(raw_url)  # URL 표준화 적용
+    urls = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return jsonify({"urls": urls})
 
+# B 서버: 크롤링 결과 저장
+@app.route("/api/crawl-result", methods=["POST"])
+def crawl_result():
+    results = request.json.get("results", [])
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor()
 
-    valid, result = validate_url_or_reject(raw_url, cursor)
-    if not valid:
-        conn.commit()
-        conn.close()
-        return jsonify({'message': result}), 400
+    for result in results:
+        url_id = result["url_id"]
+        status = result["status"]
+        error_message = result.get("error_message")
+        data = result.get("data")
 
-    url = result  # 정상화된 URL
+        # 크롤링 성공 처리
+        if status == "Success":
+            product_name = data["product_name"]
+            model_name = data["model_name"]
+            image_url = data["image_url"]
+            options = data["options"]
+            release_price = data["release_price"]
+            employee_price = data["employee_price"]
 
-    # URL 중복 확인
-    cursor.execute('''
-        SELECT * FROM user_requests WHERE url = ? AND status = 'pending'
-    ''', (url,))
-    existing_request = cursor.fetchone()
+            # 상품 정보 저장
+            cur.execute("""
+                INSERT OR IGNORE INTO product (url_id, product_name, image_url, model_name, options)
+                VALUES (?, ?, ?, ?, ?)
+            """, (url_id, product_name, image_url, model_name, options))
 
-    if existing_request:
-        conn.close()
-        return jsonify({'message': '이미 수집 대기 중인 URL입니다.'}), 200
+            # 가격 정보 저장
+            cur.execute("""
+                INSERT INTO price_history (product_id, date_recorded, release_price, employee_price)
+                VALUES ((SELECT product_id FROM product WHERE url_id = ?), DATE('now'), ?, ?)
+            """, (url_id, release_price, employee_price))
 
-    # 데이터 수집 요청 기록
-    requested_at = datetime.now()
-    cursor.execute('''
-        INSERT INTO user_requests (url, requested_at, status)
-        VALUES (?, ?, 'pending')
-    ''', (url, requested_at))
+        # 크롤링 실패 처리
+        cur.execute("""
+            INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
+            VALUES (?, DATETIME('now'), ?, ?)
+        """, (url_id, status, error_message))
+
     conn.commit()
     conn.close()
+    return jsonify({"message": "Crawl results processed successfully."})
 
-    return jsonify({'message': '데이터 수집 요청이 성공적으로 접수되었습니다.'})
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)

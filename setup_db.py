@@ -1,66 +1,67 @@
 import sqlite3
 
-def create_tables():
-    # 데이터베이스 연결 (파일이 없으면 생성됨)
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
+DATABASE = "product_data.db"
 
-    # product 테이블 생성
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS product (
-            product_id VARCHAR(255) PRIMARY KEY,
-            url VARCHAR(255) UNIQUE NOT NULL,
-            name VARCHAR(255) NOT NULL,
-            model VARCHAR(255),
-            options TEXT,
-            image_url VARCHAR(255)
-        );
-    ''')
+conn = sqlite3.connect(DATABASE)
+cur = conn.cursor()
 
-    # price_history 테이블 생성
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS price_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            product_id VARCHAR(255) NOT NULL,
-            date DATE NOT NULL,
-            original_price DECIMAL,
-            employee_price DECIMAL,
-            FOREIGN KEY (product_id) REFERENCES product(product_id) ON DELETE CASCADE
-        );
-    ''')
+# URL 테이블
+cur.execute("""
+CREATE TABLE IF NOT EXISTS url (
+    url_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT UNIQUE NOT NULL,
+    status TEXT CHECK(status IN ('active', 'inactive')) NOT NULL DEFAULT 'active',
+    added_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+""")
 
-    # user_requests 테이블 생성
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_requests (
-            request_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url VARCHAR(255) NOT NULL,
-            requested_at DATETIME NOT NULL,
-            status VARCHAR(50) DEFAULT 'pending'
-        );
-    ''')
-# pending: 요청 대기 상태.
-# in_progress: 처리 중.
-# completed: 성공적으로 처리 완료.
-# failed: 요청 실패.
-# rejected: 허용되지 않은 요청.
+# 상품 테이블
+cur.execute("""
+CREATE TABLE IF NOT EXISTS product (
+    product_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url_id INTEGER NOT NULL,
+    product_name TEXT NOT NULL,
+    image_url TEXT,
+    model_name TEXT,
+    options TEXT,
+    FOREIGN KEY (url_id) REFERENCES url (url_id) ON DELETE CASCADE
+);
+""")
 
+# 가격 기록 테이블
+cur.execute("""
+CREATE TABLE IF NOT EXISTS price_history (
+    price_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    date_recorded DATE NOT NULL,
+    release_price REAL,
+    employee_price REAL,
+    FOREIGN KEY (product_id) REFERENCES product (product_id) ON DELETE CASCADE
+);
+""")
 
-    # product_hits 테이블 생성
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS product_hits (
-            product_id VARCHAR(255) NOT NULL,
-            date DATE NOT NULL,
-            daily_hits INTEGER DEFAULT 0,
-            total_hits INTEGER,
-            PRIMARY KEY (product_id, date),
-            FOREIGN KEY (product_id) REFERENCES product(product_id) ON DELETE CASCADE
-        );
-    ''')
+# 크롤링 로그 테이블
+cur.execute("""
+CREATE TABLE IF NOT EXISTS crawl_log (
+    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url_id INTEGER NOT NULL,
+    attempt_time DATETIME NOT NULL,
+    status TEXT CHECK(status IN ('Success', 'Failed')) NOT NULL,
+    error_message TEXT,
+    FOREIGN KEY (url_id) REFERENCES url (url_id) ON DELETE CASCADE
+);
+""")
 
-    # 변경사항 커밋 및 연결 종료
-    conn.commit()
-    conn.close()
-    print("Database and tables created successfully.")
+# 사용자 요청 테이블
+cur.execute("""
+CREATE TABLE IF NOT EXISTS user_request (
+    request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url_id INTEGER NOT NULL,
+    status TEXT CHECK(status IN ('Pending', 'Complete')) NOT NULL DEFAULT 'Pending',
+    requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (url_id) REFERENCES url (url_id) ON DELETE CASCADE
+);
+""")
 
-if __name__ == '__main__':
-    create_tables()
+conn.commit()
+conn.close()
