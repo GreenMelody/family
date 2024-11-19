@@ -53,6 +53,7 @@ def verify_api_key():
             return jsonify({"error": "Invalid API Key"}), 403
 
 # URL 상태 확인 API
+# URL 상태 확인 API
 @app.route("/api/url-status", methods=["GET"])
 def url_status():
     url = request.args.get("url")
@@ -71,15 +72,33 @@ def url_status():
     # URL 데이터 가져오기
     cur.execute("SELECT * FROM url WHERE url = ?", (formatted_url,))
     url_row = cur.fetchone()
-    if not url_row:
-        return jsonify({"status": "error", "message": "해당 URL은 데이터베이스에 존재하지 않습니다."}), 404
 
+    if not url_row:
+        # URL이 데이터베이스에 없으면 추가
+        cur.execute("""
+            INSERT INTO url (url, status, added_date) VALUES (?, 'pending', DATETIME('now'))
+        """, (formatted_url,))
+        url_id = cur.lastrowid
+
+        # user_request에 요청 추가
+        cur.execute("""
+            INSERT INTO user_request (url_id, status, requested_at) VALUES (?, 'Pending', DATETIME('now'))
+        """, (url_id,))
+
+        conn.commit()
+        conn.close()
+
+        # 사용자에게 데이터 수집 시작 메시지 전달
+        return jsonify({
+            "status": "pending",
+            "message": "해당 URL은 수집된 데이터가 없습니다. 지금부터 데이터 수집을 시작합니다."
+        })
+
+    # URL이 이미 데이터베이스에 있는 경우 상태별 처리
     if url_row["status"] == "active":
-        # 상품 데이터 가져오기
         cur.execute("SELECT * FROM product WHERE url_id = ?", (url_row["url_id"],))
         product = cur.fetchone()
 
-        # 가격 데이터 가져오기
         cur.execute("""
             SELECT date_recorded AS date, release_price, employee_price
             FROM price_history WHERE product_id = ?
@@ -99,10 +118,7 @@ def url_status():
             "prices": prices
         })
     elif url_row["status"] == "inactive":
-        # inactive 상태에서 이전 데이터를 반환
-        cur.execute("""
-            SELECT * FROM product WHERE url_id = ?
-        """, (url_row["url_id"],))
+        cur.execute("SELECT * FROM product WHERE url_id = ?", (url_row["url_id"],))
         product = cur.fetchone()
 
         cur.execute("""
@@ -123,7 +139,6 @@ def url_status():
             "options": product["options"],
             "product_url": url_row["url"]
         })
-
     elif url_row["status"] == "pending":
         conn.close()
         return jsonify({
