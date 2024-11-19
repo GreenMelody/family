@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .product-container {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+        .product-info {
+            flex: 1;
+            margin-right: 20px;
+        }
+        .product-image {
+            flex: 1;
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .price-info {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="product_name">sample02</div>
+    <div class="product-container">
+        <!-- Product Details -->
+        <div class="product-info">
+            <div id="model_name"> Model02</div>
+            <div id="options">Color: Red, Size: M02</div>
+            <div id="release_price"> 2,000,000</div>
+            <div id="employee_price">200,000</div>
+        </div>
+
+        <!-- Product Image -->
+        <div class="product-image">
+            <div id="image_url">http://127.0.0.1:5000/product/sample02</div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div  id="product_page">http://127.0.0.1:5000/product/sample02</div>
+    </footer>
+</body>
+</html>

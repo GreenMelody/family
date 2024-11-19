@@ -1,145 +1,127 @@
 import requests
-import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import schedule
-from datetime import datetime
-from bs4 import BeautifulSoup  # 크롤링용
-import logging
+import time
 
-# A 서버 URL 및 인증 키
-A_SERVER_URL = "http://127.0.0.1:5000"  # A 서버 URL
-API_KEY = "your_api_key_here"           # A 서버와 통신할 API 키
+# A 서버 정보
+A_SERVER_URL = "http://127.0.0.1:5000"
+API_KEY = "your_shared_secret_key"
 
-# 로그 설정
-logging.basicConfig(
-    filename="app_B.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Selenium WebDriver 초기화
+def initialize_webdriver():
+    chrome_options = Options()
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    # chrome_options.add_argument("--headless")
+    # chrome_options.add_argument("--no-sandbox")
+    # chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(A_SERVER_URL)  # 프로그램 시작 시 초기 URL 접속
+    print(f"Initialized WebDriver and accessed {A_SERVER_URL}")
+    return driver
 
-def fetch_url_list(type="all"):
-    """
-    A 서버에서 URL 리스트 가져오기
-    type: 'all' (1시 전체 크롤링), 'retry' (재시도 크롤링)
-    """
+# 크롤링 함수
+def crawl_url(driver, url):
+    print(f"Crawling URL: {url}")
+    wait = WebDriverWait(driver, 5)
     try:
-        response = requests.get(
-            f"{A_SERVER_URL}/api/url-list",
-            headers={"Authorization": f"Bearer {API_KEY}"},
-            params={"type": type}
-        )
-        if response.status_code == 200:
-            return response.json().get("urls", [])
-        else:
-            logging.error(f"Failed to fetch URL list: {response.status_code} - {response.text}")
-            return []
-    except Exception as e:
-        logging.error(f"Error fetching URL list: {e}")
-        return []
-
-def send_crawl_results(results):
-    """
-    크롤링 결과를 A 서버에 전송
-    """
-    try:
-        response = requests.post(
-            f"{A_SERVER_URL}/api/crawl-result",
-            headers={"Authorization": f"Bearer {API_KEY}"},
-            json={"results": results}
-        )
-        if response.status_code == 200:
-            logging.info("Successfully sent crawl results to A server.")
-        else:
-            logging.error(f"Failed to send crawl results: {response.status_code} - {response.text}")
-    except Exception as e:
-        logging.error(f"Error sending crawl results: {e}")
-
-def crawl_url(url):
-    """
-    개별 URL 크롤링 수행
-    """
-    try:
-        # 예시 크롤링 로직 (BeautifulSoup 사용)
-        response = requests.get(url)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            # 크롤링 결과 예시
-            product_name = soup.select_one("h1.product-title").text.strip()
-            product_model = soup.select_one(".model-number").text.strip()
-            product_image_url = soup.select_one("img.product-image")["src"]
-            options = soup.select_one(".product-options").text.strip()
-            release_price = float(soup.select_one(".release-price").text.strip().replace(",", ""))
-            employee_price = float(soup.select_one(".employee-price").text.strip().replace(",", ""))
-
-            return {
-                "status": "Success",
-                "data": {
-                    "product_name": product_name,
-                    "model_name": product_model,
-                    "image_url": product_image_url,
-                    "options": options,
-                    "release_price": release_price,
-                    "employee_price": employee_price
-                }
+        driver.get(url)  # 기존 브라우저로 URL 변경
+        product_name = wait.until(EC.presence_of_element_located((By.ID, "product_name"))).text
+        model_name = driver.find_element(By.ID, "model_name").text
+        image_url = driver.find_element(By.ID, "image_url").text
+        options = driver.find_element(By.ID, "options").text
+        release_price = float(driver.find_element(By.ID, "release_price").text.replace(",", ""))
+        employee_price = float(driver.find_element(By.ID, "employee_price").text.replace(",", ""))
+        print(f"product_name: {product_name}")
+        print(f"model_name: {model_name}")
+        print(f"image_url: {image_url}")
+        print(f"options: {options}")
+        print(f"release_price: {release_price}")
+        print(f"employee_price: {employee_price}")
+        return {
+            "status": "Success",
+            "data": {
+                "product_name": product_name,
+                "model_name": model_name,
+                "image_url": image_url,
+                "options": options,
+                "release_price": release_price,
+                "employee_price": employee_price,
             }
-        else:
-            return {"status": "Failed", "error_message": f"HTTP {response.status_code}"}
+        }
+    except NoSuchElementException as e:
+        return {
+            "status": "Failed",
+            "error_message": f"Element not found: {str(e)}"
+        }
     except Exception as e:
-        return {"status": "Failed", "error_message": str(e)}
+        return {
+            "status": "Failed",
+            "error_message": f"Unexpected error: {str(e)}"
+        }
 
-def perform_crawl(type="all"):
-    """
-    크롤링 수행 (전체 또는 재시도)
-    """
-    logging.info(f"Starting crawl for type: {type}")
-    url_list = fetch_url_list(type)
+# 크롤링 결과 A 서버에 전달
+def send_crawl_results(results):
+    url = f"{A_SERVER_URL}/api/crawl-result"
+    headers = {"API-Key": API_KEY, "Content-Type": "application/json"}
+    response = requests.post(url, json={"results": results}, headers=headers)
+    if response.status_code == 200:
+        print("Crawl results successfully sent to A server.")
+    else:
+        print(f"Failed to send crawl results: {response.status_code} - {response.text}")
+
+# URL 크롤링 작업
+def crawl_task(driver, crawl_type):
+    headers = {"API-Key": API_KEY}
+    response = requests.get(f"{A_SERVER_URL}/api/url-list?type={crawl_type}", headers=headers)
+
+    if response.status_code != 200:
+        print(f"Failed to fetch URLs: {response.status_code} - {response.text}")
+        return
+
+    urls = response.json().get("urls", [])
+    if not urls:
+        print(f"No URLs to crawl for type: {crawl_type}")
+        return
+
     results = []
+    for url_entry in urls:
+        url_id = url_entry["url_id"]
+        url = url_entry["url"]
+        crawl_result = crawl_url(driver, url)
+        crawl_result["url_id"] = url_id
+        results.append(crawl_result)
 
-    for url_data in url_list:
-        url_id = url_data["url_id"]
-        url = url_data["url"]
-
-        logging.info(f"Starting crawl for URL: {url}")
-        crawl_result = crawl_url(url)
-
-        if crawl_result["status"] == "Success":
-            results.append({
-                "url_id": url_id,
-                "status": "Success",
-                "error_message": None,
-                "data": crawl_result["data"]
-            })
-            logging.info(f"Successfully crawled URL: {url}")
-        else:
-            results.append({
-                "url_id": url_id,
-                "status": "Failed",
-                "error_message": crawl_result["error_message"]
-            })
-            logging.error(f"Failed to crawl URL: {url} - Error: {crawl_result['error_message']}")
-
+    # A 서버에 결과 전달
     send_crawl_results(results)
-    logging.info(f"Completed crawl for type: {type}")
 
-# 스케줄링
-schedule.every().day.at("01:00").do(lambda: perform_crawl(type="all"))  # 전체 크롤링
-schedule.every().day.at("07:00").do(lambda: perform_crawl(type="retry"))  # 재시도 크롤링
-schedule.every().day.at("13:00").do(lambda: perform_crawl(type="retry"))  # 재시도 크롤링
-schedule.every().day.at("19:00").do(lambda: perform_crawl(type="retry"))  # 재시도 크롤링
+# 크롤링 일정 예약
+def schedule_crawling(driver):
+    # 2시: active와 pending 크롤링
+    schedule.every().day.at("02:00").do(crawl_task, driver, crawl_type="all")
+    # 8시, 16시, 22시: fail과 pending 크롤링
+    schedule.every().day.at("08:00").do(crawl_task, driver, crawl_type="retry")
+    schedule.every().day.at("16:00").do(crawl_task, driver, crawl_type="retry")
+    schedule.every().day.at("22:00").do(crawl_task, driver, crawl_type="retry")
 
-if __name__ == "__main__":
-    logging.info("B Server started.")
     while True:
         schedule.run_pending()
         time.sleep(1)
 
+if __name__ == "__main__":
+    # WebDriver 초기화
+    driver = initialize_webdriver()
 
-# 인증 추가
-# API_KEY = "your_shared_secret_key"
+    try:
+        # 즉시 실행 테스트
+        crawl_task(driver, "all")
+        crawl_task(driver, "pending")
 
-# def get_url_list_from_a_server():
-#     headers = {"API-Key": API_KEY}
-#     response = requests.get("http://A_SERVER_ADDRESS/api/url-list", headers=headers)
-#     if response.status_code == 403:
-#         print("API Key 인증 실패")
-#         return None
-#     return response.json()
+        # 예약 작업 실행
+        # schedule_crawling(driver)
+    finally:
+        driver.quit()  # 프로그램 종료 시 WebDriver 닫기

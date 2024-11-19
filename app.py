@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify, render_template
 import sqlite3
 from datetime import datetime
 from urllib.parse import urlparse
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 DATABASE = "product_data.db"
@@ -9,7 +12,7 @@ DATABASE = "product_data.db"
 API_KEY = "your_shared_secret_key"
 
 # 허용된 도메인 설정
-ALLOWED_DOMAIN = "www.example.com"
+ALLOWED_DOMAIN = "127.0.0.1:5000"
 
 # 데이터베이스 연결 함수
 def get_db_connection():
@@ -40,17 +43,21 @@ def validate_and_format_url(input_url):
 def index():
     return render_template("index.html")
 
-@app.before_request
-def verify_api_key():
-    # static 파일 요청 및 일반 사용자 웹 요청은 제외
-    if request.endpoint in ["index", "static"]:
-        return
+# @app.before_request
+# def verify_api_key():
+#     # `request.endpoint`가 None인 경우를 처리
+#     if not request.endpoint:
+#         return
 
-    # API 요청에만 API 키 검증
-    if request.endpoint.startswith("api"):
-        api_key = request.headers.get("API-Key")
-        if api_key != API_KEY:
-            return jsonify({"error": "Invalid API Key"}), 403
+#     # static 파일 요청 및 일반 사용자 웹 요청은 제외
+#     if request.endpoint in ["index", "static"]:
+#         return
+
+#     # API 요청에만 API 키 검증
+#     if request.endpoint.startswith("api"):
+#         api_key = request.headers.get("API-Key")
+#         if api_key != API_KEY:
+#             return jsonify({"error": "Invalid API Key"}), 403
 
 # URL 상태 확인 API
 # URL 상태 확인 API
@@ -202,8 +209,15 @@ def url_list():
                   HAVING COUNT(*) >= 1
               )
         """)
+    elif type_param == "pending":
+        # Pending 상태의 URL 가져오기
+        cur.execute("""
+            SELECT url_id, url
+            FROM url
+            WHERE status = 'pending'
+        """)
     else:
-        # 전체 URL 가져오기
+        # 전체 활성 URL 가져오기
         cur.execute("SELECT url_id, url FROM url WHERE status = 'active'")
 
     urls = [dict(row) for row in cur.fetchall()]
@@ -217,64 +231,116 @@ def crawl_result():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    for result in results:
-        url_id = result["url_id"]
-        status = result["status"]
-        error_message = result.get("error_message")
-        data = result.get("data")
+    try:
+        for result in results:
+            url_id = result["url_id"]
+            status = result["status"]
+            error_message = result.get("error_message")
+            data = result.get("data")
 
-        if status == "Success":
-            # 성공 처리
-            product_name = data["product_name"]
-            model_name = data["model_name"]
-            image_url = data["image_url"]
-            options = data["options"]
-            release_price = data["release_price"]
-            employee_price = data["employee_price"]
+            if status == "Success":
+                # 데이터 유효성 검증
+                required_fields = ["product_name", "model_name", "image_url", "options", "release_price", "employee_price"]
+                if not all(field in data for field in required_fields):
+                    cur.execute("""
+                        INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
+                        VALUES (?, DATETIME('now'), 'Failed', 'Missing required fields in data')
+                    """, (url_id,))
+                    continue
 
-            # 상품 정보 저장
-            cur.execute("""
-                INSERT OR IGNORE INTO product (url_id, product_name, image_url, model_name, options)
-                VALUES (?, ?, ?, ?, ?)
-            """, (url_id, product_name, image_url, model_name, options))
+                product_name = data["product_name"]
+                model_name = data["model_name"]
+                image_url = data["image_url"]
+                options = data["options"]
+                release_price = data["release_price"]
+                employee_price = data["employee_price"]
 
-            # 가격 정보 저장
-            cur.execute("""
-                INSERT INTO price_history (product_id, date_recorded, release_price, employee_price)
-                VALUES ((SELECT product_id FROM product WHERE url_id = ?), DATE('now'), ?, ?)
-            """, (url_id, release_price, employee_price))
+                # 상품 정보 저장
+                cur.execute("""
+                    INSERT OR IGNORE INTO product (url_id, product_name, image_url, model_name, options)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (url_id, product_name, image_url, model_name, options))
 
-            # 실패 횟수 초기화 및 마지막 시도 시간 갱신
-            cur.execute("""
-                UPDATE url
-                SET fail_count = 0, last_attempt = DATETIME('now')
-                WHERE url_id = ?
-            """, (url_id,))
+                # 중복된 가격 데이터 방지
+                cur.execute("""
+                    SELECT 1 FROM price_history 
+                    WHERE product_id = (SELECT product_id FROM product WHERE url_id = ?) 
+                    AND date_recorded = DATE('now')
+                """, (url_id,))
+                if cur.fetchone():
+                    continue
 
-        elif status == "Failed":
-            # 실패 처리: 실패 횟수 증가 및 마지막 시도 시간 갱신
-            cur.execute("""
-                UPDATE url
-                SET fail_count = fail_count + 1, last_attempt = DATETIME('now')
-                WHERE url_id = ?
-            """, (url_id,))
+                # 가격 정보 저장
+                cur.execute("""
+                    INSERT INTO price_history (product_id, date_recorded, release_price, employee_price)
+                    VALUES ((SELECT product_id FROM product WHERE url_id = ?), DATE('now'), ?, ?)
+                """, (url_id, release_price, employee_price))
 
-            # 크롤링 실패 기록
-            cur.execute("""
-                INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
-                VALUES (?, DATETIME('now'), 'Failed', ?)
-            """, (url_id, error_message))
+                # URL 상태 갱신
+                cur.execute("""
+                    UPDATE url
+                    SET status = 'active', fail_count = 0, last_attempt = DATETIME('now')
+                    WHERE url_id = ?
+                """, (url_id,))
 
-            # 실패 횟수가 3 이상이고 최근 3일 동안 실패한 경우 inactive 상태로 변경
-            cur.execute("""
-                UPDATE url
-                SET status = 'inactive'
-                WHERE url_id = ? AND fail_count >= 3 AND last_attempt <= DATETIME('now', '-3 days')
-            """, (url_id,))
+                # 성공 기록 추가
+                cur.execute("""
+                    INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
+                    VALUES (?, DATETIME('now'), 'Success', NULL)
+                """, (url_id,))
 
-    conn.commit()
-    conn.close()
+                # user_request 테이블 업데이트
+                cur.execute("""
+                    UPDATE user_request
+                    SET status = 'Complete'
+                    WHERE url_id = ? AND status = 'Pending'
+                """, (url_id,))
+
+                logging.info(f"URL ID {url_id} 크롤링 성공: {data['product_name']}")
+
+            elif status == "Failed":
+                # 실패 처리
+                cur.execute("""
+                    UPDATE url
+                    SET fail_count = fail_count + 1, last_attempt = DATETIME('now')
+                    WHERE url_id = ?
+                """, (url_id,))
+                
+                cur.execute("""
+                    INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
+                    VALUES (?, DATETIME('now'), 'Failed', ?)
+                """, (url_id, error_message))
+                
+                # 실패 횟수가 3 이상이고 최근 3일 동안 실패한 경우 inactive 상태로 변경
+                cur.execute("""
+                    UPDATE url
+                    SET status = 'inactive'
+                    WHERE url_id = ? AND fail_count >= 3 AND last_attempt <= DATETIME('now', '-3 days')
+                """, (url_id,))
+
+                logging.warning(f"URL ID {url_id} 크롤링 실패: {error_message}")
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"message": "An error occurred during crawl result processing", "error": str(e)}), 500
+    finally:
+        conn.close()
+
     return jsonify({"message": "Crawl results processed successfully."})
+
+#sample pages for crawling test
+@app.route("/product/sample01")
+def product01():
+    return render_template("sample01.html")
+
+@app.route("/product/sample02")
+def product02():
+    return render_template("sample02.html")
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 if __name__ == "__main__":
     app.run(debug=True)
