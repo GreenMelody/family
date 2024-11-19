@@ -1,78 +1,12 @@
-.container {
-    max-width: 600px;
+/* 전체 컨테이너를 가운데 정렬 및 너비 설정 */
+.centered-container {
     margin: 0 auto;
-    padding: 20px;
     text-align: center;
+    width: 50%;
 }
 
-#url-input {
-    width: 80%;
-    padding: 10px;
-    margin-top: 20px;
-}
-
-#search-button {
-    padding: 10px 20px;
-    margin-top: 20px;
-}
-
-.result-container {
-    margin-top: 30px;
-    text-align: left;
-}
-
-.product-info {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.product-details {
-    flex: 1;
-}
-
-.product-image {
-    flex: 0 0 150px;
-    text-align: right;
-}
-
-.product-image img {
-    max-width: 150px;
-    height: auto;
-}
-
-.chart-container {
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.date-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.date-controls input[type="date"],
-.date-controls button {
-    padding: 5px 10px;
-    font-size: 14px;
-}
-
-.product-image img {
-    max-width: 150px; /* 너비 최대값 */
-    max-height: 150px; /* 높이 최대값 */
-    object-fit: contain; /* 이미지 비율 유지 */
-    border: 1px solid #ddd; /* 선택적 테두리 */
-    border-radius: 5px; /* 선택적 테두리 둥글게 */
-    padding: 5px; /* 선택적 여백 */
-}
-
-.status-message {
-    margin-top: 20px;
-    font-size: 14px;
-    color: #555;
-    font-style: italic;
+/* 입력 필드와 버튼 간격 */
+.centered-container input,
+.centered-container button {
+    margin: 10px 0;
 }

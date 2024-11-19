@@ -25,16 +25,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (data.status === "active") {
             resultDiv.innerHTML = `
-                <p>해당 URL은 ${data.start_date}부터 데이터 수집 중입니다.</p>
-                <p>상품명: ${data.product_name}</p>
-                <p>
-                    <a href="${data.image_url}" target="_blank">
-                        <img src="${data.image_url}" alt="Product Image" style="width: 150px;">
-                    </a>
-                </p>
-                <p>모델명: ${data.model_name}</p>
-                <p>옵션: ${data.options}</p>
-                <p><a href="${data.product_url}" target="_blank">상품 페이지 바로가기</a></p>
+                <p><strong>해당 URL은 ${data.start_date}부터 데이터 수집 중입니다.<strong></p>
+                <div class="row">
+                    <!-- 왼쪽 열 -->
+                    <div class="col-md-6 text-start">
+                        <p><strong>상품명:</strong> ${data.product_name}</p>
+                        <p><strong>모델명:</strong> ${data.model_name}</p>
+                        <p><strong>옵션:</strong> ${data.options}</p>
+                        <p><strong>상품페이지: </strong><a href="${data.product_url}" target="_blank">바로가기</a></p>
+                    </div>
+                    <!-- 오른쪽 열 -->
+                    <div class="col-md-6 text-center">
+                        <a href="${data.image_url}" target="_blank">
+                            <img src="${data.image_url}" alt="Product Image" class="img-fluid rounded">
+                        </a>
+                    </div>
+                </div>
 
                 <div class="mt-4">
                     <label for="startDate">시작</label>
