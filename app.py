@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 import logging
 
@@ -13,6 +13,14 @@ API_KEY = "your_shared_secret_key"
 
 # 허용된 도메인 설정
 ALLOWED_DOMAIN = "127.0.0.1:5000"
+
+KST = timezone(timedelta(hours=9))
+
+def get_kst_date():
+    return datetime.now(KST).date().isoformat()
+
+def get_kst_datetime():
+    return datetime.now(KST).isoformat(timespec='seconds')
 
 # 데이터베이스 연결 함수
 def get_db_connection():
@@ -43,21 +51,21 @@ def validate_and_format_url(input_url):
 def index():
     return render_template("index.html")
 
-# @app.before_request
-# def verify_api_key():
-#     # `request.endpoint`가 None인 경우를 처리
-#     if not request.endpoint:
-#         return
+@app.before_request
+def verify_api_key():
+    # `request.endpoint`가 None인 경우를 처리
+    if not request.endpoint:
+        return
 
-#     # static 파일 요청 및 일반 사용자 웹 요청은 제외
-#     if request.endpoint in ["index", "static"]:
-#         return
+    # static 파일 요청 및 일반 사용자 웹 요청은 제외
+    if request.endpoint in ["index", "static"]:
+        return
 
-#     # API 요청에만 API 키 검증
-#     if request.endpoint.startswith("api"):
-#         api_key = request.headers.get("API-Key")
-#         if api_key != API_KEY:
-#             return jsonify({"error": "Invalid API Key"}), 403
+    # API 요청에만 API 키 검증
+    if request.endpoint.startswith("api"):
+        api_key = request.headers.get("API-Key")
+        if api_key != API_KEY:
+            return jsonify({"error": "Invalid API Key"}), 403
 
 # URL 상태 확인 API
 # URL 상태 확인 API
@@ -83,14 +91,14 @@ def url_status():
     if not url_row:
         # URL이 데이터베이스에 없으면 추가
         cur.execute("""
-            INSERT INTO url (url, status, added_date) VALUES (?, 'pending', DATETIME('now'))
-        """, (formatted_url,))
+            INSERT INTO url (url, status, added_date) VALUES (?, 'pending', ?)
+        """, (formatted_url, get_kst_datetime()))
         url_id = cur.lastrowid
 
         # user_request에 요청 추가
         cur.execute("""
-            INSERT INTO user_request (url_id, status, requested_at) VALUES (?, 'Pending', DATETIME('now'))
-        """, (url_id,))
+            INSERT INTO user_request (url_id, status, requested_at) VALUES (?, 'Pending', ?)
+        """, (url_id, get_kst_datetime()))
 
         conn.commit()
         conn.close()
@@ -244,8 +252,8 @@ def crawl_result():
                 if not all(field in data for field in required_fields):
                     cur.execute("""
                         INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
-                        VALUES (?, DATETIME('now'), 'Failed', 'Missing required fields in data')
-                    """, (url_id,))
+                        VALUES (?, ?, 'Failed', 'Missing required fields in data')
+                    """, (url_id, get_kst_datetime()))
                     continue
 
                 product_name = data["product_name"]
@@ -255,39 +263,44 @@ def crawl_result():
                 release_price = data["release_price"]
                 employee_price = data["employee_price"]
 
-                # 상품 정보 저장
+                # 상품 정보 삽입 (중복 방지)
                 cur.execute("""
-                    INSERT OR IGNORE INTO product (url_id, product_name, image_url, model_name, options)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (url_id, product_name, image_url, model_name, options))
+                    SELECT 1 FROM product WHERE url_id = ?
+                """, (url_id,))
+                if not cur.fetchone():
+                    # 데이터가 없을 때만 삽입
+                    cur.execute("""
+                        INSERT INTO product (url_id, product_name, image_url, model_name, options)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (url_id, product_name, image_url, model_name, options))
 
                 # 중복된 가격 데이터 방지
                 cur.execute("""
                     SELECT 1 FROM price_history 
                     WHERE product_id = (SELECT product_id FROM product WHERE url_id = ?) 
-                    AND date_recorded = DATE('now')
-                """, (url_id,))
+                    AND date_recorded = ?
+                """, (url_id, get_kst_date()))
                 if cur.fetchone():
                     continue
 
                 # 가격 정보 저장
                 cur.execute("""
                     INSERT INTO price_history (product_id, date_recorded, release_price, employee_price)
-                    VALUES ((SELECT product_id FROM product WHERE url_id = ?), DATE('now'), ?, ?)
-                """, (url_id, release_price, employee_price))
+                    VALUES ((SELECT product_id FROM product WHERE url_id = ?), ?, ?, ?)
+                """, (url_id, get_kst_date(), release_price, employee_price))
 
                 # URL 상태 갱신
                 cur.execute("""
                     UPDATE url
-                    SET status = 'active', fail_count = 0, last_attempt = DATETIME('now')
+                    SET status = 'active', fail_count = 0, last_attempt = ?
                     WHERE url_id = ?
-                """, (url_id,))
+                """, (get_kst_datetime(), url_id))
 
                 # 성공 기록 추가
                 cur.execute("""
                     INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
-                    VALUES (?, DATETIME('now'), 'Success', NULL)
-                """, (url_id,))
+                    VALUES (?, ?, 'Success', NULL)
+                """, (url_id, get_kst_datetime()))
 
                 # user_request 테이블 업데이트
                 cur.execute("""
@@ -302,21 +315,22 @@ def crawl_result():
                 # 실패 처리
                 cur.execute("""
                     UPDATE url
-                    SET fail_count = fail_count + 1, last_attempt = DATETIME('now')
+                    SET fail_count = fail_count + 1, last_attempt = ?
                     WHERE url_id = ?
-                """, (url_id,))
+                """, (get_kst_datetime(), url_id))
                 
                 cur.execute("""
                     INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
-                    VALUES (?, DATETIME('now'), 'Failed', ?)
-                """, (url_id, error_message))
+                    VALUES (?, ?, 'Failed', ?)
+                """, (url_id, get_kst_datetime(), error_message))
                 
                 # 실패 횟수가 3 이상이고 최근 3일 동안 실패한 경우 inactive 상태로 변경
+                kst_three_days_ago = (datetime.now(KST) - timedelta(days=3)).isoformat(timespec='seconds')
                 cur.execute("""
                     UPDATE url
                     SET status = 'inactive'
-                    WHERE url_id = ? AND fail_count >= 3 AND last_attempt <= DATETIME('now', '-3 days')
-                """, (url_id,))
+                    WHERE url_id = ? AND fail_count >= 3 AND last_attempt <= ?
+                """, (url_id, kst_three_days_ago))
 
                 logging.warning(f"URL ID {url_id} 크롤링 실패: {error_message}")
 

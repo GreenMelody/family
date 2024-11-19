@@ -102,11 +102,17 @@ def crawl_task(driver, crawl_type):
 # 크롤링 일정 예약
 def schedule_crawling(driver):
     # 2시: active와 pending 크롤링
-    schedule.every().day.at("02:00").do(crawl_task, driver, crawl_type="all")
+    schedule.every().day.at("08:43").do(crawl_task, driver, crawl_type="all")
+    schedule.every().day.at("08:43").do(crawl_task, driver, crawl_type="pending")
     # 8시, 16시, 22시: fail과 pending 크롤링
-    schedule.every().day.at("08:00").do(crawl_task, driver, crawl_type="retry")
-    schedule.every().day.at("16:00").do(crawl_task, driver, crawl_type="retry")
-    schedule.every().day.at("22:00").do(crawl_task, driver, crawl_type="retry")
+    schedule.every().day.at("08:45").do(crawl_task, driver, crawl_type="retry")
+    schedule.every().day.at("08:45").do(crawl_task, driver, crawl_type="pending")
+
+    schedule.every().day.at("08:47").do(crawl_task, driver, crawl_type="retry")
+    schedule.every().day.at("08:47").do(crawl_task, driver, crawl_type="pending")
+
+    schedule.every().day.at("08:48").do(crawl_task, driver, crawl_type="retry")
+    schedule.every().day.at("08:48").do(crawl_task, driver, crawl_type="pending")
 
     while True:
         schedule.run_pending()
