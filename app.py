@@ -3,16 +3,34 @@ import sqlite3
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 import logging
-
-logging.basicConfig(level=logging.INFO)
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
+
 DATABASE = "product_data.db"
 
 API_KEY = "your_shared_secret_key"
 
 # 허용된 도메인 설정
 ALLOWED_DOMAIN = "127.0.0.1:5000"
+
+# 로그 설정
+def setup_logging():
+    # 로그 포맷 정의
+    log_format = "%(asctime)s [%(filename)s:%(lineno)d] [%(levelname)s] %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
+
+    # RotatingFileHandler를 사용하여 로그 파일 설정
+    log_file = "app.log"
+    file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5)
+    file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+
+    # Flask 기본 로거에 핸들러 추가
+    app.logger.setLevel(logging.INFO)  # 로그 레벨 설정
+    app.logger.addHandler(file_handler)
+
+# Flask 애플리케이션 시작 시 로깅 설정
+setup_logging()
 
 KST = timezone(timedelta(hours=9))
 
@@ -238,6 +256,7 @@ def crawl_result():
     results = request.json.get("results", [])
     conn = get_db_connection()
     cur = conn.cursor()
+    app.logger.info(f"crawl result : {results}")
 
     try:
         for result in results:
@@ -309,7 +328,7 @@ def crawl_result():
                     WHERE url_id = ? AND status = 'Pending'
                 """, (url_id,))
 
-                logging.info(f"URL ID {url_id} 크롤링 성공: {data['product_name']}")
+                app.logger.info(f"URL ID {url_id} 크롤링 성공: {data['product_name']}")
 
             elif status == "Failed":
                 # 실패 처리
@@ -332,7 +351,7 @@ def crawl_result():
                     WHERE url_id = ? AND fail_count >= 3 AND last_attempt <= ?
                 """, (url_id, kst_three_days_ago))
 
-                logging.warning(f"URL ID {url_id} 크롤링 실패: {error_message}")
+                app.logger.warning(f"URL ID {url_id} 크롤링 실패: {error_message}")
 
         conn.commit()
     except Exception as e:
