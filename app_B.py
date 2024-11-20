@@ -7,6 +7,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import schedule
 import time
+import threading
+import logging
+
+# 로그 설정
+logging.basicConfig(
+    level=logging.INFO,  # 로그 수준 설정
+    format="%(asctime)s [%(filename)s:%(lineno)d] [%(levelname)s] %(message)s",  # 출력 형식
+    handlers=[
+        logging.StreamHandler(),  # 콘솔 출력
+        logging.FileHandler("app_B.log", encoding="utf-8"),  # 파일 출력
+    ]
+)
 
 # A 서버 정보
 A_SERVER_URL = "http://127.0.0.1:5000"
@@ -21,12 +33,11 @@ def initialize_webdriver():
     # chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(A_SERVER_URL)  # 프로그램 시작 시 초기 URL 접속
-    print(f"Initialized WebDriver and accessed {A_SERVER_URL}")
+    logging.info(f"Initialized WebDriver and accessed {A_SERVER_URL}")
     return driver
 
 # 크롤링 함수
 def crawl_url(driver, url):
-    print(f"Crawling URL: {url}")
     wait = WebDriverWait(driver, 5)
     try:
         driver.get(url)  # 기존 브라우저로 URL 변경
@@ -36,12 +47,16 @@ def crawl_url(driver, url):
         options = driver.find_element(By.ID, "options").text
         release_price = float(driver.find_element(By.ID, "release_price").text.replace(",", ""))
         employee_price = float(driver.find_element(By.ID, "employee_price").text.replace(",", ""))
-        print(f"product_name: {product_name}")
-        print(f"model_name: {model_name}")
-        print(f"image_url: {image_url}")
-        print(f"options: {options}")
-        print(f"release_price: {release_price}")
-        print(f"employee_price: {employee_price}")
+
+        logging.info(f"")
+        logging.info(f"Crawling URL: {url}")
+        logging.info(f"product_name: {product_name}")
+        logging.info(f"model_name: {model_name}")
+        logging.info(f"image_url: {image_url}")
+        logging.info(f"options: {options}")
+        logging.info(f"release_price: {release_price}")
+        logging.info(f"employee_price: {employee_price}\n")
+
         return {
             "status": "Success",
             "data": {
@@ -70,9 +85,9 @@ def send_crawl_results(results):
     headers = {"API-Key": API_KEY, "Content-Type": "application/json"}
     response = requests.post(url, json={"results": results}, headers=headers)
     if response.status_code == 200:
-        print("Crawl results successfully sent to A server.")
+        logging.info("Crawl results successfully sent to A server.")
     else:
-        print(f"Failed to send crawl results: {response.status_code} - {response.text}")
+        logging.error(f"Failed to send crawl results: {response.status_code} - {response.text}")
 
 # URL 크롤링 작업
 def crawl_task(driver, crawl_type):
@@ -80,12 +95,12 @@ def crawl_task(driver, crawl_type):
     response = requests.get(f"{A_SERVER_URL}/api/url-list?type={crawl_type}", headers=headers)
 
     if response.status_code != 200:
-        print(f"Failed to fetch URLs: {response.status_code} - {response.text}")
+        logging.error(f"Failed to fetch URLs: {response.status_code} - {response.text}")
         return
 
     urls = response.json().get("urls", [])
     if not urls:
-        print(f"No URLs to crawl for type: {crawl_type}")
+        logging.error(f"No URLs to crawl for type: {crawl_type}")
         return
 
     results = []
@@ -102,8 +117,8 @@ def crawl_task(driver, crawl_type):
 # 크롤링 일정 예약
 def schedule_crawling(driver):
     # 2시: active와 pending 크롤링
-    schedule.every().day.at("08:43").do(crawl_task, driver, crawl_type="all")
-    schedule.every().day.at("08:43").do(crawl_task, driver, crawl_type="pending")
+    schedule.every().day.at("10:46").do(crawl_task, driver, crawl_type="all")
+    schedule.every().day.at("10:46").do(crawl_task, driver, crawl_type="pending")
     # 8시, 16시, 22시: fail과 pending 크롤링
     schedule.every().day.at("08:45").do(crawl_task, driver, crawl_type="retry")
     schedule.every().day.at("08:45").do(crawl_task, driver, crawl_type="pending")
@@ -121,13 +136,26 @@ def schedule_crawling(driver):
 if __name__ == "__main__":
     # WebDriver 초기화
     driver = initialize_webdriver()
+    crawl_task(driver, "all")
 
     try:
-        # 즉시 실행 테스트
-        crawl_task(driver, "all")
-        crawl_task(driver, "pending")
-
         # 예약 작업 실행
-        # schedule_crawling(driver)
+        logging.info("Type 'exit' to stop the scheduler.")
+        scheduler_thread = threading.Thread(target=schedule_crawling, args=(driver,), daemon=True)
+        scheduler_thread.start()
+
+        # 사용자 입력 대기
+        while True:
+            command = input("> ")
+            if command.lower() in ["exit", "quit"]:
+                logging.info("Exiting...")
+                schedule.clear()  # 모든 작업 정리
+                break
+    except KeyboardInterrupt:
+        logging.info("Exiting due to interrupt...")
+        schedule.clear()  # 안전하게 정리
     finally:
-        driver.quit()  # 프로그램 종료 시 WebDriver 닫기
+        logging.info("Closing WebDriver...")
+        driver.quit()  # WebDriver 닫기
+        logging.info("WebDriver closed.")
+
