@@ -74,6 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <tbody id="priceTableBody"></tbody>
                 </table>
             `;
+            resultDiv.style.display = "block";
 
             updateGraph(data.prices);
             updateTable(data.prices);
@@ -103,6 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
             resultDiv.innerHTML = `
                 <p>${data.message}</p>
             `;
+            resultDiv.style.display = "block";
         }
     };
 
