@@ -3,25 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Data Tracker</title>
+    <title>Data Tracker</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/index.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-<div class="container mt-4">
-    <div class="centered-container">
-        <h1>Data Tracker</h1>
+<div class="container-fluid main-container">
+    <header class="py-3 text-center">
+        <h1 class="logo">Data<span class="highlight">Tracker</span></h1>
+    </header>
+    <div class="search-container text-center">
         <div class="input-group mb-3">
             <input type="text" class="form-control" id="urlInput" placeholder="https://www.example.com/product/12345">
-            <button class="btn btn-primary" id="searchButton">검색</button>
-        </div>
-        <div id="result" class="mt-4">
-            <!-- 결과 내용이 동적으로 여기에 추가됩니다 -->
+            <button class="btn btn-primary search-button" id="searchButton">검색</button>
         </div>
     </div>
+    <div id="result" class="result-container mt-4 text-white">
+        <!-- 동적으로 결과 추가 -->
+    </div>
 </div>
-
 <script src="/static/js/index.js"></script>
 </body>
 </html>

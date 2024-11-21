@@ -1,12 +1,69 @@
-/* 전체 컨테이너를 가운데 정렬 및 너비 설정 */
-.centered-container {
-    margin: 0 auto;
-    text-align: center;
-    width: 50%;
+/* 메인 배경색과 텍스트 색상 */
+body {
+    background-color: #000000;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
 }
 
-/* 입력 필드와 버튼 간격 */
-.centered-container input,
-.centered-container button {
-    margin: 10px 0;
+/* 컨테이너 스타일 */
+.main-container {
+    max-width: 50%;
+    margin: 0 auto;
+    text-align: center;
+    padding: 20px;
+}
+
+/* 로고 스타일 */
+.logo {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.logo .highlight {
+    color: #ff9900;
+}
+
+/* 검색 박스 스타일 */
+.search-container .form-control {
+    border-radius: 0;
+    border: none;
+}
+
+.search-container .search-button {
+    background-color: #ff9900;
+    border: none;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.search-container .search-button:hover {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+/* 결과 컨테이너 스타일 */
+.result-container {
+    padding: 20px;
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+/* 테이블 스타일 */
+.table {
+    color: #ffffff;
+    border-color: #333333;
+}
+
+.table th, .table td {
+    color: #ffffff;
+}
+
+/* 이미지 스타일 */
+.img-fluid {
+    max-height: 300px;
+    margin: 10px auto;
+    border: 2px solid #ff9900;
+    border-radius: 5px;
 }

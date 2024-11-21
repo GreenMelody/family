@@ -18,7 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         const response = await fetch(`/api/url-status?url=${encodeURIComponent(url)}`);
         const data = await response.json();
-        console.log("API 응답 데이터:", data);
 
         const resultDiv = document.getElementById("result");
         resultDiv.innerHTML = ""; // 기존 내용 초기화
@@ -118,29 +117,70 @@ function updateGraph(prices) {
                 {
                     label: "출고가",
                     data: prices.map((price) => price.release_price),
-                    borderColor: "blue",
+                    borderColor: "#FF5733", // 밝은 주황색
+                    backgroundColor: "rgba(255, 87, 51, 0.2)", // 투명 주황색
                     borderWidth: 2,
+                    pointBackgroundColor: "#FF5733",
+                    pointBorderColor: "#FF5733",
+                    pointRadius: 5, // 데이터 포인트 크기
                 },
                 {
                     label: "임직원가",
                     data: prices.map((price) => price.employee_price),
-                    borderColor: "green",
+                    borderColor: "#28A745", // 밝은 녹색
+                    backgroundColor: "rgba(40, 167, 69, 0.2)", // 투명 녹색
                     borderWidth: 2,
+                    pointBackgroundColor: "#28A745",
+                    pointBorderColor: "#28A745",
+                    pointRadius: 5, // 데이터 포인트 크기
                 },
             ],
         },
         options: {
             responsive: true,
             plugins: {
-                legend: { display: true },
+                legend: {
+                    display: true,
+                    labels: {
+                        color: "#FFFFFF", // 범례 텍스트 흰색
+                    },
+                },
             },
             scales: {
-                x: { title: { display: true, text: "날짜" } },
-                y: { title: { display: true, text: "가격" } },
+                x: {
+                    title: {
+                        display: true,
+                        text: "날짜",
+                        color: "#FFFFFF", // x축 제목 흰색
+                    },
+                    ticks: {
+                        color: "#FFFFFF", // x축 눈금 흰색
+                    },
+                    grid: {
+                        color: "rgba(255, 255, 255, 0.2)", // x축 그리드 라인
+                    },
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: "가격",
+                        color: "#FFFFFF", // y축 제목 흰색
+                    },
+                    ticks: {
+                        color: "#FFFFFF", // y축 눈금 흰색
+                    },
+                    grid: {
+                        color: "rgba(255, 255, 255, 0.2)", // y축 그리드 라인
+                    },
+                },
+            },
+            layout: {
+                padding: 20, // 차트 내부 여백
             },
         },
     });
 }
+
 
 function updateTable(prices) {
     const tableBody = document.getElementById("priceTableBody");
