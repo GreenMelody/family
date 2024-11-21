@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${yyyy}-${mm}-${dd}`;
     };
 
-    document.getElementById("searchButton").addEventListener("click", async () => {
+    const searchHandler = async () => {
         const url = document.getElementById("urlInput").value.trim();
         if (!url) {
             alert("상품 페이지 URL을 입력해주세요.");
@@ -90,6 +90,17 @@ document.addEventListener("DOMContentLoaded", () => {
             resultDiv.innerHTML = `
                 <p>${data.message}</p>
             `;
+        }
+    };
+
+    // 검색 버튼 클릭 이벤트
+    document.getElementById("searchButton").addEventListener("click", searchHandler);
+
+    // 검색창 Enter 키 이벤트 추가
+    document.getElementById("urlInput").addEventListener("keypress", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault(); // 기본 Enter 동작 방지
+            searchHandler(); // 검색 버튼과 동일한 동작 실행
         }
     });
 });
@@ -180,7 +191,6 @@ function updateGraph(prices) {
         },
     });
 }
-
 
 function updateTable(prices) {
     const tableBody = document.getElementById("priceTableBody");
