@@ -10,6 +10,17 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${yyyy}-${mm}-${dd}`;
     };
 
+    const formatDateTime = (dateTimeStr) => {
+        const date = new Date(dateTimeStr);
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        const hh = String(date.getHours()).padStart(2, "0");
+        const min = String(date.getMinutes()).padStart(2, "0");
+        const sec = String(date.getSeconds()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd} ${hh}:${min}:${sec}`;
+    };
+
     const searchHandler = async () => {
         const url = document.getElementById("urlInput").value.trim();
         if (!url) {
@@ -23,8 +34,10 @@ document.addEventListener("DOMContentLoaded", () => {
         resultDiv.innerHTML = ""; // 기존 내용 초기화
 
         if (data.status === "active") {
+            const formattedStartDate = formatDateTime(data.start_date);
+
             resultDiv.innerHTML = `
-                <p><strong>해당 URL은 ${data.start_date}부터 데이터 수집 중입니다.<strong></p>
+                <p><strong>해당 URL은 ${formattedStartDate}부터 데이터 수집 중입니다.<strong></p>
                 <div class="row">
                     <!-- 왼쪽 열 -->
                     <div class="col-md-6 text-start">
