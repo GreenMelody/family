@@ -39,6 +39,27 @@ header {
     margin: 0 auto;
     text-align: center;
     padding: 20px;
+    transition: max-width 0.3s ease; /* 부드럽게 변경 */
+}
+
+/* 미디어 쿼리: 브라우저 너비가 작아질 때 */
+@media (max-width: 1200px) {
+    .main-container {
+        max-width: 70%; /* 브라우저 너비가 작아지면 컨테이너 넓어짐 */
+    }
+}
+
+@media (max-width: 768px) {
+    .main-container {
+        max-width: 90%; /* 태블릿 크기 */
+    }
+}
+
+@media (max-width: 576px) {
+    .main-container {
+        max-width: 100%; /* 모바일 크기 */
+        padding: 10px; /* 패딩 축소 */
+    }
 }
 
 .logo .highlight {
@@ -85,7 +106,7 @@ header {
 .img-fluid {
     max-height: 300px;
     margin: 10px auto;
-    border: 2px solid #ff9900;
+    /* border: 2px solid #ff9900; */
     border-radius: 5px;
 }
 
