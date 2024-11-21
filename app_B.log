@@ -1,0 +1,24 @@
+2024-11-20 11:20:09,987 [app_B.py:36] [INFO] Initialized WebDriver and accessed http://127.0.0.1:5000
+2024-11-20 11:20:10,183 [app_B.py:51] [INFO] 
+2024-11-20 11:20:10,184 [app_B.py:52] [INFO] Crawling URL: http://127.0.0.1:5000/product/sample01
+2024-11-20 11:20:10,184 [app_B.py:53] [INFO] product_name: sample01
+2024-11-20 11:20:10,184 [app_B.py:54] [INFO] model_name: Model01
+2024-11-20 11:20:10,185 [app_B.py:55] [INFO] image_url: http://127.0.0.1:5000/product/sample01
+2024-11-20 11:20:10,185 [app_B.py:56] [INFO] options: Color: Red, Size: M01
+2024-11-20 11:20:10,186 [app_B.py:57] [INFO] release_price: 1000000.0
+2024-11-20 11:20:10,186 [app_B.py:58] [INFO] employee_price: 800000.0
+
+2024-11-20 11:20:10,349 [app_B.py:51] [INFO] 
+2024-11-20 11:20:10,350 [app_B.py:52] [INFO] Crawling URL: http://127.0.0.1:5000/product/sample02
+2024-11-20 11:20:10,350 [app_B.py:53] [INFO] product_name: sample02
+2024-11-20 11:20:10,351 [app_B.py:54] [INFO] model_name: Model02
+2024-11-20 11:20:10,351 [app_B.py:55] [INFO] image_url: http://127.0.0.1:5000/product/sample02
+2024-11-20 11:20:10,352 [app_B.py:56] [INFO] options: Color: Red, Size: M02
+2024-11-20 11:20:10,352 [app_B.py:57] [INFO] release_price: 2000000.0
+2024-11-20 11:20:10,353 [app_B.py:58] [INFO] employee_price: 200000.0
+
+2024-11-20 11:20:10,358 [app_B.py:88] [INFO] Crawl results successfully sent to A server.
+2024-11-20 11:20:10,358 [app_B.py:143] [INFO] Type 'exit' to stop the scheduler.
+2024-11-20 12:58:18,611 [app_B.py:151] [INFO] Exiting...
+2024-11-20 12:58:18,611 [app_B.py:158] [INFO] Closing WebDriver...
+2024-11-20 12:58:20,795 [app_B.py:160] [INFO] WebDriver closed.

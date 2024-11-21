@@ -1,15 +1,23 @@
-from flask import Flask, request, jsonify, render_template
+import os
 import sqlite3
-from datetime import datetime, timezone, timedelta
-from urllib.parse import urlparse
 import logging
 from logging.handlers import RotatingFileHandler
+from urllib.parse import urlparse
+from flask import Flask, request, jsonify, render_template
+from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 
-DATABASE = "product_data.db"
+dotenv_path = os.path.abspath(os.path.join('./sharedworkspace','.env'))
+load_dotenv(dotenv_path)
 
-API_KEY = "your_shared_secret_key"
+app.secret_key = os.getenv('FAMILY_SECRET_KEY')
+app_db_path = os.getenv('FAMILY_DB_PATH')
+app_db_file = os.getenv('FAMILY_DB_FILE')
+
+app_db_file_path = os.path.join(app_db_path, app_db_file)
+API_KEY = os.getenv('FAMILY_API_KEY')
 
 # 허용된 도메인 설정
 ALLOWED_DOMAIN = "127.0.0.1:5000"
@@ -42,7 +50,7 @@ def get_kst_datetime():
 
 # 데이터베이스 연결 함수
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(app_db_file_path)
     conn.row_factory = sqlite3.Row  # Row 객체로 반환
     return conn
 
