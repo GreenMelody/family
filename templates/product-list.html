@@ -55,7 +55,7 @@
                     <td>{{ product.options }}</td>
                     <td>{{ product.added_date }}</td>
                     <td><a href="{{ product.product_link }}" target="_blank">View Product</a></td>
-                    <td><a href="{{ product.tracking_link }}" target="_blank">Track Product</a></td>
+                    <td><a href="/?url={{ product.product_link }}" target="_blank">Track Product</a></td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -113,6 +113,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // 검색 버튼 클릭 이벤트
     document.getElementById("searchButton").addEventListener("click", searchHandler);
 
+    // URL 파라미터에서 URL 검색
+    const params = new URLSearchParams(window.location.search);
+    const urlParam = params.get("url");
+    if (urlParam) {
+        document.getElementById("urlInput").value = urlParam;
+        searchHandler(); // 자동으로 검색 수행
+    }
+
     // 검색창 Enter 키 이벤트 추가
     document.getElementById("urlInput").addEventListener("keypress", (event) => {
         if (event.key === "Enter") {
