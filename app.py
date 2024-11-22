@@ -3,7 +3,7 @@ import sqlite3
 import logging
 from logging.handlers import RotatingFileHandler
 from urllib.parse import urlparse
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_file
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
@@ -372,20 +372,19 @@ def crawl_result():
 
 from datetime import datetime
 
-@app.route("/product-list")
-def product_list():
+# 정적 HTML 생성
+def generate_product_list_html():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # DB에서 상품 데이터 조회
     cur.execute("""
         SELECT 
-            url.url_id AS [index],  -- 예약어를 대괄호로 감싸 사용
+            url.url_id AS [index],  
             product.product_name, 
             product.model_name, 
             product.options, 
-            url.added_date AS start_date,
-            url.last_attempt AS last_date,
+            DATE(url.added_date) AS start_date,
+            DATE(url.last_attempt) AS last_date,
             url.status,
             url.url AS product_link
         FROM url
@@ -395,28 +394,20 @@ def product_list():
     products = cur.fetchall()
     conn.close()
 
-    # 데이터 가공
-    def format_date(date_str):
-        if date_str:
-            return datetime.fromisoformat(date_str).strftime("%Y-%m-%d")
-        return "N/A"
+    # HTML 파일 생성
+    html_content = render_template("product-list-template.html", products=products)
+    output_file = os.path.join("static", "product-list.html")
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html_content)
+    print(f"Generated product-list.html at {output_file}")
 
-    products_data = [
-        {
-            "index": idx + 1,
-            "product_name": row["product_name"] or "N/A",
-            "model_name": row["model_name"] or "N/A",
-            "options": row["options"] or "N/A",
-            "start_date": format_date(row["start_date"]),
-            "last_date": format_date(row["last_date"]),
-            "status": row["status"],
-            "product_link": row["product_link"],
-            "tracking_link": f"/?url={row['product_link']}"  # 추적 링크
-        }
-        for idx, row in enumerate(products)
-    ]
-
-    return render_template("product-list.html", products=products_data)
+@app.route("/product-list")
+def product_list():
+    file_path = os.path.join("static", "product-list.html")
+    if os.path.exists(file_path):
+        return send_file(file_path)
+    else:
+        return "Product list not available. Please try again later.", 404
 
 #sample pages for crawling test
 @app.route("/product/sample01")
