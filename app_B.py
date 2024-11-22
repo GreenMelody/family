@@ -204,10 +204,9 @@ def request_generate_product_list(driver):
     except Exception as e:
         logging.error(f"Error while requesting product list generation: {e}")
 
-
 # 크롤링 일정 예약
 def schedule_crawling(driver):
-    crawl_time=["02:00", "08:00", "16:00", "22:00"]
+    crawl_time = ["02:00", "08:00", "16:00", "22:00"]
 
     # 2시: active와 pending 크롤링
     schedule.every().day.at(crawl_time[0]).do(crawl_task, driver, crawl_type="all")
@@ -267,6 +266,7 @@ menu = Menu(
         MenuItem("Crawl Pending", lambda icon, item: manual_crawl("pending")),
         MenuItem("Crawl Retry", lambda icon, item: manual_crawl("retry")),
     )),
+    MenuItem("Gen List", lambda icon, item: request_generate_product_list(driver)),
     MenuItem("Quit", lambda icon, item: quit(icon)),
 )
 

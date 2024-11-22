@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product List</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        header {
+            display: flex;
+            justify-content: space-between; /* 로고와 가운데 텍스트 사이 간격 조정 */
+            align-items: center; /* 세로 가운데 정렬 */
+            position: relative;
+        }
+
+        .logo {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+
+        .fam {
+            color: white;
+            font-size: 2.5rem;
+        }
+
+        .hub {
+            color: black;
+            background-color: #FF9900; /* Orange background */
+            font-size: 2.5rem;
+            line-height: 1.3;
+            padding: 0rem 0.1em;
+            border-radius: 0.2em; /* Rounded corners */
+            margin-left: 0.2em;
+        }
+
+        .page-title {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        .table-container {
+            margin: 20px auto;
+            max-width: 90%;
+            position: relative;
+        }
+
+        .generated-time {
+            right: 0;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        table {
+            background-color: #1a1a1a;
+        }
+
+        th, td {
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        a {
+            color: #ff9900;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container table-container">
+        <header class="py-3">
+            <a href="/" class="logo">
+                <span class="fam">Fam</span>
+                <span class="hub">hub</span>
+            </a>
+            <h1 class="page-title">Product List</h1>
+        </header>
+        <div class="generated-time">2024-11-22 14:19:59 기준 데이터</div>
+        <table class="table table-dark table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Index</th>
+                    <th>Product Name</th>
+                    <th>Model Name</th>
+                    <th>Options</th>
+                    <th>Start Date</th>
+                    <th>Last Date</th>
+                    <th>Status</th>
+                    <th>Product Link</th>
+                    <th>Tracking Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                <tr>
+                    <td>1</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>2024-11-21</td>
+                    <td>2024-11-22</td>
+                    <td>pending</td>
+                    <td><a href="http://127.0.0.1:5000/product/sample07" target="_blank">View Product</a></td>
+                    <td><a href="/?url=http://127.0.0.1:5000/product/sample07" target="_blank">Track Product</a></td>
+                </tr>
+                
+                <tr>
+                    <td>2</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>2024-11-21</td>
+                    <td>2024-11-22</td>
+                    <td>pending</td>
+                    <td><a href="http://127.0.0.1:5000/product/sample06" target="_blank">View Product</a></td>
+                    <td><a href="/?url=http://127.0.0.1:5000/product/sample06" target="_blank">Track Product</a></td>
+                </tr>
+                
+                <tr>
+                    <td>3</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>2024-11-21</td>
+                    <td>2024-11-22</td>
+                    <td>pending</td>
+                    <td><a href="http://127.0.0.1:5000/product/sample05" target="_blank">View Product</a></td>
+                    <td><a href="/?url=http://127.0.0.1:5000/product/sample05" target="_blank">Track Product</a></td>
+                </tr>
+                
+                <tr>
+                    <td>4</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>2024-11-21</td>
+                    <td>2024-11-22</td>
+                    <td>pending</td>
+                    <td><a href="https://127.0.0.1:5000/product/sample01" target="_blank">View Product</a></td>
+                    <td><a href="/?url=https://127.0.0.1:5000/product/sample01" target="_blank">Track Product</a></td>
+                </tr>
+                
+                <tr>
+                    <td>5</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>None</td>
+                    <td>2024-11-20</td>
+                    <td>2024-11-22</td>
+                    <td>pending</td>
+                    <td><a href="http://127.0.0.1:5000/product/sample03" target="_blank">View Product</a></td>
+                    <td><a href="/?url=http://127.0.0.1:5000/product/sample03" target="_blank">Track Product</a></td>
+                </tr>
+                
+                <tr>
+                    <td>6</td>
+                    <td>sample02</td>
+                    <td>Model02</td>
+                    <td>Color: Red, Size: M02</td>
+                    <td>2024-11-20</td>
+                    <td>2024-11-21</td>
+                    <td>active</td>
+                    <td><a href="http://127.0.0.1:5000/product/sample02" target="_blank">View Product</a></td>
+                    <td><a href="/?url=http://127.0.0.1:5000/product/sample02" target="_blank">Track Product</a></td>
+                </tr>
+                
+                <tr>
+                    <td>7</td>
+                    <td>sample01</td>
+                    <td>Model01</td>
+                    <td>Color: Red, Size: M01</td>
+                    <td>2024-11-20</td>
+                    <td>2024-11-21</td>
+                    <td>active</td>
+                    <td><a href="http://127.0.0.1:5000/product/sample01" target="_blank">View Product</a></td>
+                    <td><a href="/?url=http://127.0.0.1:5000/product/sample01" target="_blank">Track Product</a></td>
+                </tr>
+                
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
