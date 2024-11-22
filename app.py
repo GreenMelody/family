@@ -370,6 +370,43 @@ def crawl_result():
 
     return jsonify({"message": "Crawl results processed successfully."})
 
+@app.route("/product-list")
+def product_list():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # DB에서 상품 데이터 조회
+    cur.execute("""
+        SELECT 
+            product.product_id AS [index],  -- 예약어를 대괄호로 감싸 사용
+            product.product_name, 
+            product.model_name, 
+            product.options, 
+            url.added_date, 
+            url.url AS product_link
+        FROM product
+        INNER JOIN url ON product.url_id = url.url_id
+        ORDER BY url.added_date DESC
+    """)
+    products = cur.fetchall()
+    conn.close()
+
+    # 데이터 가공
+    products_data = [
+        {
+            "index": idx + 1,
+            "product_name": row["product_name"],
+            "model_name": row["model_name"],
+            "options": row["options"],
+            "added_date": row["added_date"],
+            "product_link": row["product_link"],
+            "tracking_link": f"/?url={row['product_link']}"  # 추적 링크
+        }
+        for idx, row in enumerate(products)
+    ]
+
+    return render_template("product-list.html", products=products_data)
+
 #sample pages for crawling test
 @app.route("/product/sample01")
 def product01():
