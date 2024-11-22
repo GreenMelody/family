@@ -121,6 +121,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // 검색창 포커스 시 텍스트 전체 선택
+    document.getElementById("urlInput").addEventListener("focus", (event) => {
+        event.target.select();
+    });
+
     // 브라우저 크기 변경 시 차트 리사이즈
     window.addEventListener("resize", () => {
         if (chartInstance) {
