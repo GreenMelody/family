@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import logging
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from urllib.parse import urlparse
 from flask import Flask, request, jsonify, render_template, send_file
@@ -370,8 +371,6 @@ def crawl_result():
 
     return jsonify({"message": "Crawl results processed successfully."})
 
-from datetime import datetime
-
 # 정적 HTML 생성
 def generate_product_list_html():
     conn = get_db_connection()
@@ -394,16 +393,35 @@ def generate_product_list_html():
     products = cur.fetchall()
     conn.close()
 
+    # 데이터 가공
+    products_data = [
+        {
+            "index": idx + 1,
+            "product_name": row["product_name"],
+            "model_name": row["model_name"],
+            "options": row["options"],
+            "start_date": row["start_date"],
+            "last_date": row["last_date"],
+            "status": row["status"],
+            "product_link": row["product_link"],
+            "tracking_link": f"/?url={(row['product_link'])}"  # URL 인코딩 적용
+        }
+        for idx, row in enumerate(products)
+    ]
+
+    # 생성 시각 추가
+    generated_time = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")  # YYYY-MM-DD HH:MM:SS 형식
+
     # HTML 파일 생성
-    html_content = render_template("product-list-template.html", products=products)
-    output_file = os.path.join("static", "product-list.html")
+    html_content = render_template("product-list-template.html", products=products_data, generated_time=generated_time)
+    output_file = os.path.join("static", "product-list", "product-list.html")
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(html_content)
     print(f"Generated product-list.html at {output_file}")
 
 @app.route("/product-list")
 def product_list():
-    file_path = os.path.join("static", "product-list.html")
+    file_path = os.path.join("static","product-list", "product-list.html")
     if os.path.exists(file_path):
         return send_file(file_path)
     else:

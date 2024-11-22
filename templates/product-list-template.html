@@ -14,6 +14,12 @@
         .table-container {
             margin: 20px auto;
             max-width: 90%;
+            position: relative;
+        }
+        .generated-time {
+            right: 0;
+            font-size: 0.9rem;
+            color: #ccc;
         }
         table {
             background-color: #1a1a1a;
@@ -34,6 +40,7 @@
 <body>
     <div class="container table-container">
         <h1 class="text-center my-4">Product List</h1>
+        <div class="generated-time">{{ generated_time }} 기준 데이터</div>
         <table class="table table-dark table-striped table-hover">
             <thead>
                 <tr>
@@ -45,6 +52,7 @@
                     <th>Last Date</th>
                     <th>Status</th>
                     <th>Product Link</th>
+                    <th>Tracking Link</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,6 +66,7 @@
                     <td>{{ product.last_date }}</td>
                     <td>{{ product.status }}</td>
                     <td><a href="{{ product.product_link }}" target="_blank">View Product</a></td>
+                    <td><a href="{{ product.tracking_link }}" target="_blank">Track Product</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
