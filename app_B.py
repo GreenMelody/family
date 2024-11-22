@@ -115,59 +115,63 @@ def send_crawl_results(results):
 # URL 크롤링 작업
 def crawl_task(driver, crawl_type):
     logging.info(f"Crawl type : {crawl_type}")
+    icon.icon = create_image(64, 64, "blue", "red")
 
-    script = f"""
-    return fetch('{A_SERVER_URL}/api/url-list?type={crawl_type}',{{
-        method: 'GET',
-        headers: {{
-            'Content-Type':'application/json'
-        }}
-    }})
-    .then(response => {{
-        return response.json().then(data => {{
+    try:
+        script = f"""
+        return fetch('{A_SERVER_URL}/api/url-list?type={crawl_type}',{{
+            method: 'GET',
+            headers: {{
+                'Content-Type':'application/json'
+            }}
+        }})
+        .then(response => {{
+            return response.json().then(data => {{
+                return {{
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: data
+                }};
+            }});
+        }})
+        .catch(error => {{
             return {{
-                status: response.status,
-                statusText: response.statusText,
-                data: data
+                status: 500,
+                statusText: 'Internal Server Error',
+                error: error.toString()
             }};
         }});
-    }})
-    .catch(error => {{
-        return {{
-            status: 500,
-            statusText: 'Internal Server Error',
-            error: error.toString()
-        }};
-    }});
-    """
-    response = driver.execute_script(script)
+        """
+        response = driver.execute_script(script)
 
-    if response["status"] != 200:
-        logging.error(f"Error: HTTP {response['status']} - {response['statusText']}")
-        if "error" in response:
-            logging.error(f"Error details: {response['error']}")
-        return
+        if response["status"] != 200:
+            logging.error(f"Error: HTTP {response['status']} - {response['statusText']}")
+            if "error" in response:
+                logging.error(f"Error details: {response['error']}")
+            return
 
-    urls = response["data"].get("urls", [])
-    logging.info(f"urls:{urls}")
-    if not urls:
-        logging.error(f"No URLs to crawl for type: {crawl_type}")
-        return
+        urls = response["data"].get("urls", [])
+        logging.info(f"urls:{urls}")
+        if not urls:
+            logging.error(f"No URLs to crawl for type: {crawl_type}")
+            return
 
-    results = []
-    for url_entry in urls:
-        url_id = url_entry["url_id"]
-        url = url_entry["url"]
-        crawl_result = crawl_url(driver, url)
-        crawl_result["url_id"] = url_id
-        results.append(crawl_result)
+        results = []
+        for url_entry in urls:
+            url_id = url_entry["url_id"]
+            url = url_entry["url"]
+            crawl_result = crawl_url(driver, url)
+            crawl_result["url_id"] = url_id
+            results.append(crawl_result)
 
-    logging.info(f"results:{results}")
-    # A 서버에 결과 전달
-    if results:
-        send_crawl_results(results)
-    else:
-        logging.info(f"No results to send")
+        logging.info(f"results:{results}")
+        # A 서버에 결과 전달
+        if results:
+            send_crawl_results(results)
+        else:
+            logging.info(f"No results to send")
+    finally:
+        icon.icon = create_image(64, 64, "blue", "white")
 
 # 크롤링 일정 예약
 def schedule_crawling(driver):
@@ -189,7 +193,6 @@ def schedule_crawling(driver):
     while scheduler_running:
         schedule.run_pending()
         time.sleep(1)
-
 
 driver = None
 scheduler_running = True
