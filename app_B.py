@@ -173,6 +173,38 @@ def crawl_task(driver, crawl_type):
     finally:
         icon.icon = create_image(64, 64, "blue", "white")
 
+def request_generate_product_list(driver):
+    script = f"""
+    return fetch('{A_SERVER_URL}/api/generate-product-list', {{
+        method: 'POST',
+        headers: {{
+            'Content-Type': 'application/json'
+        }}
+    }})
+    .then(response => {{
+        if (response.ok) {{
+            return response.json();
+        }} else {{
+            throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+        }}
+    }})
+    .then(data => {{
+        return {{status: 'success', data: data}};
+    }})
+    .catch(error => {{
+        return {{status: 'error', message: error.toString()}};
+    }});
+    """
+    try:
+        response = driver.execute_script(script)
+        if response["status"] == "success":
+            logging.info(f"Successfully requested product list generation: {response['data']}")
+        else:
+            logging.error(f"Failed to generate product list: {response['message']}")
+    except Exception as e:
+        logging.error(f"Error while requesting product list generation: {e}")
+
+
 # 크롤링 일정 예약
 def schedule_crawling(driver):
     crawl_time=["02:00", "08:00", "16:00", "22:00"]
@@ -180,15 +212,19 @@ def schedule_crawling(driver):
     # 2시: active와 pending 크롤링
     schedule.every().day.at(crawl_time[0]).do(crawl_task, driver, crawl_type="all")
     schedule.every().day.at(crawl_time[0]).do(crawl_task, driver, crawl_type="pending")
+    schedule.every().day.at(crawl_time[0]).do(request_generate_product_list, driver)
     # 8시, 16시, 22시: fail과 pending 크롤링
     schedule.every().day.at(crawl_time[1]).do(crawl_task, driver, crawl_type="retry")
     schedule.every().day.at(crawl_time[1]).do(crawl_task, driver, crawl_type="pending")
+    schedule.every().day.at(crawl_time[1]).do(request_generate_product_list, driver)
 
     schedule.every().day.at(crawl_time[2]).do(crawl_task, driver, crawl_type="retry")
     schedule.every().day.at(crawl_time[2]).do(crawl_task, driver, crawl_type="pending")
+    schedule.every().day.at(crawl_time[2]).do(request_generate_product_list, driver)
 
     schedule.every().day.at(crawl_time[3]).do(crawl_task, driver, crawl_type="retry")
     schedule.every().day.at(crawl_time[3]).do(crawl_task, driver, crawl_type="pending")
+    schedule.every().day.at(crawl_time[3]).do(request_generate_product_list, driver)
 
     while scheduler_running:
         schedule.run_pending()

@@ -95,7 +95,6 @@ def verify_api_key():
             return jsonify({"error": "Invalid API Key"}), 403
 
 # URL 상태 확인 API
-# URL 상태 확인 API
 @app.route("/api/url-status", methods=["GET"])
 def url_status():
     url = request.args.get("url")
@@ -417,7 +416,7 @@ def generate_product_list_html():
     output_file = os.path.join("static", "product-list", "product-list.html")
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(html_content)
-    print(f"Generated product-list.html at {output_file}")
+    logging.info(f"Generated product-list.html at {output_file}")
 
 @app.route("/product-list")
 def product_list():
@@ -426,6 +425,15 @@ def product_list():
         return send_file(file_path)
     else:
         return "Product list not available. Please try again later.", 404
+
+@app.route("/api/generate-product-list", methods=["POST"])
+def generate_product_list():
+    try:
+        generate_product_list_html()
+        return jsonify({"status": "success", "message": "Product list generated successfully."}), 200
+    except Exception as e:
+        app.logger.error(f"Error generating product list: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 #sample pages for crawling test
 @app.route("/product/sample01")
