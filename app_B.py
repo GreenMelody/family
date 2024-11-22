@@ -10,22 +10,14 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from pystray import Icon, Menu, MenuItem
+from PIL import Image, ImageDraw
 
 os.environ |= {
     'http_proxy': '',
     'https_proxy': '',
     'no_proxy': 'localhost, 127.0.0.1'
 }
-
-# 로그 설정
-logging.basicConfig(
-    level=logging.INFO,  # 로그 수준 설정
-    format="%(asctime)s [%(filename)s:%(lineno)d] [%(levelname)s] %(message)s",  # 출력 형식
-    handlers=[
-        logging.StreamHandler(),  # 콘솔 출력
-        logging.FileHandler("app_B.log", encoding="utf-8"),  # 파일 출력
-    ]
-)
 
 # A 서버 정보
 A_SERVER_URL = "http://127.0.0.1:5000"
@@ -194,47 +186,77 @@ def schedule_crawling(driver):
     schedule.every().day.at(crawl_time[3]).do(crawl_task, driver, crawl_type="retry")
     schedule.every().day.at(crawl_time[3]).do(crawl_task, driver, crawl_type="pending")
 
-    while True:
+    while scheduler_running:
         schedule.run_pending()
         time.sleep(1)
 
+
+driver = None
+scheduler_running = True
+scheduler_thread = None
+
+# 트레이 아이콘용 이미지 생성
+def create_image(width, height, color1, color2):
+    image = Image.new("RGB", (width, height), color1)
+    dc = ImageDraw.Draw(image)
+    dc.rectangle(
+        [(width // 4, height // 4), (width * 3 // 4, height * 3 // 4)], fill=color2
+    )
+    return image
+
+def quit(icon):
+    global scheduler_running
+    logging.info(f"프로그램을 종료합니다.")
+    schedule.clear()
+    scheduler_running = False
+    while scheduler_thread.is_alive():
+        logging.info(f"wait till the thread end")
+        time.sleep(1)
+    logging.info(f"thread stopped")
+    time.sleep(1)
+    icon.stop()  # 트레이 아이콘 종료
+
+# 크롤링 실행 메뉴
+def manual_crawl(crawl_type):
+    logging.info(f"Manual crawl requested for type: {crawl_type}")
+    crawl_task(driver, crawl_type)
+
+# 트레이 메뉴 구성
+menu = Menu(
+    MenuItem("Manual Crawl", Menu(
+        MenuItem("Crawl All", lambda icon, item: manual_crawl("all")),
+        MenuItem("Crawl Pending", lambda icon, item: manual_crawl("pending")),
+        MenuItem("Crawl Retry", lambda icon, item: manual_crawl("retry")),
+    )),
+    MenuItem("Quit", lambda icon, item: quit(icon)),
+)
+
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(filename)s:%(lineno)d] [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler(), logging.FileHandler("app_B.log", encoding="utf-8")]
+    )
+
     driver = initialize_webdriver()
 
+    # 트레이 아이콘 생성
+    icon = Icon(
+        "Server B Crawler",
+        icon=create_image(64, 64, "blue", "white"),
+        title="Server B",
+        menu=menu,
+    )
+
     try:
-        # 예약 작업 실행
-        logging.info("Type 'exit' to stop the scheduler.")
         scheduler_thread = threading.Thread(target=schedule_crawling, args=(driver,), daemon=True)
         scheduler_thread.start()
-
-        # 사용자 입력 대기
-        while True:
-            command = input("> ")
-            if command.lower() in ["exit", "quit"]:
-                logging.info("Exiting...")
-                schedule.clear()  # 모든 작업 정리
-                break
-            elif command.lower() in ["crawl-all"]:
-                logging.info(f"Crawl urls whose status is active using command")
-                crawl_task(driver, "all")
-            elif command.lower() in ["crawl-pending"]:
-                logging.info(f"Crawl urls whose status is pending using command")
-                crawl_task(driver, "pending")
-            elif command.lower() in ["crawl-retry"]:
-                logging.info(f"Crawl urls whose status is fail using command")
-                crawl_task(driver, "retry")
-            else:
-                print(f"crawl-all : Crawl urls whose status is active using command")
-                print(f"crawl-pending : Crawl urls whose status is pending using command")
-                print(f"crawl-retry : Crawl urls whose status is fail using command")
-                print(f"exit : After clearing the schedule and quit the driver, exit this program")
-                print(f"quit : Same as exit command")
-
+        logging.info(f"Scheduler thread started")
+        icon.run()  # 트레이 아이콘 실행
     except KeyboardInterrupt:
         logging.info("Exiting due to interrupt...")
-        schedule.clear()
     finally:
-        logging.info("Closing WebDriver...")
+        logging.info(f"Closing WebDriver...")
         if driver:
             driver.quit()
-        logging.info("WebDriver closed.")
+        logging.info(f"WebDriver closed.")
