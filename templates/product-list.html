@@ -41,7 +41,9 @@
                     <th>Product Name</th>
                     <th>Model Name</th>
                     <th>Options</th>
-                    <th>Added Date</th>
+                    <th>Start Date</th>
+                    <th>Last Date</th>
+                    <th>Status</th>
                     <th>Product Link</th>
                     <th>Tracking Link</th>
                 </tr>
@@ -53,7 +55,9 @@
                     <td>{{ product.product_name }}</td>
                     <td>{{ product.model_name }}</td>
                     <td>{{ product.options }}</td>
-                    <td>{{ product.added_date }}</td>
+                    <td>{{ product.start_date }}</td>
+                    <td>{{ product.last_date }}</td>
+                    <td>{{ product.status }}</td>
                     <td><a href="{{ product.product_link }}" target="_blank">View Product</a></td>
                     <td><a href="/?url={{ product.product_link }}" target="_blank">Track Product</a></td>
                 </tr>

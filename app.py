@@ -370,6 +370,8 @@ def crawl_result():
 
     return jsonify({"message": "Crawl results processed successfully."})
 
+from datetime import datetime
+
 @app.route("/product-list")
 def product_list():
     conn = get_db_connection()
@@ -378,27 +380,36 @@ def product_list():
     # DB에서 상품 데이터 조회
     cur.execute("""
         SELECT 
-            product.product_id AS [index],  -- 예약어를 대괄호로 감싸 사용
+            url.url_id AS [index],  -- 예약어를 대괄호로 감싸 사용
             product.product_name, 
             product.model_name, 
             product.options, 
-            url.added_date, 
+            url.added_date AS start_date,
+            url.last_attempt AS last_date,
+            url.status,
             url.url AS product_link
-        FROM product
-        INNER JOIN url ON product.url_id = url.url_id
+        FROM url
+        LEFT JOIN product ON url.url_id = product.url_id
         ORDER BY url.added_date DESC
     """)
     products = cur.fetchall()
     conn.close()
 
     # 데이터 가공
+    def format_date(date_str):
+        if date_str:
+            return datetime.fromisoformat(date_str).strftime("%Y-%m-%d")
+        return "N/A"
+
     products_data = [
         {
             "index": idx + 1,
-            "product_name": row["product_name"],
-            "model_name": row["model_name"],
-            "options": row["options"],
-            "added_date": row["added_date"],
+            "product_name": row["product_name"] or "N/A",
+            "model_name": row["model_name"] or "N/A",
+            "options": row["options"] or "N/A",
+            "start_date": format_date(row["start_date"]),
+            "last_date": format_date(row["last_date"]),
+            "status": row["status"],
             "product_link": row["product_link"],
             "tracking_link": f"/?url={row['product_link']}"  # 추적 링크
         }
