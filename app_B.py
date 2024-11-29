@@ -21,10 +21,19 @@ os.environ |= {
 
 # A 서버 정보
 A_SERVER_URL = "http://127.0.0.1:5000"
+A_SERVER_URL = "http://127.0.0.1:5000"
 INIT_URL = "http://127.0.0.1:5000"
+
+API_KEY = ""
+
+if "dev" in A_SERVER_URL:
+    icon_color = "red"
+else:
+    icon_color = "blue"
 
 # Selenium WebDriver 초기화
 def initialize_webdriver():
+    logging.info(f"== initialize_webdriver ==")
     chrome_options = Options()
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     chrome_options.add_argument("--headless=old")
@@ -39,12 +48,15 @@ def initialize_webdriver():
     driver = webdriver.Chrome(options=chrome_options)
     # driver.set_window_position(-2000, 0)
     driver.get(INIT_URL)  # 프로그램 시작 시 초기 URL 접속
+    driver.execute_script(f"window.open('{A_SERVER_URL}');")  # 새탭에 접속
     time.sleep(3)
     logging.info(f"Initialized WebDriver and accessed {INIT_URL}")
     return driver
 
 # 크롤링 함수
 def crawl_url(driver, url):
+    logging.info(f"== crawl_url ==")
+    driver.switch_to.window(driver.window_handles[0])
     wait = WebDriverWait(driver, 5)
 
     try:
@@ -78,13 +90,15 @@ def crawl_url(driver, url):
             }
         }
     except NoSuchElementException as e:
-        logging.info(f"NoSuchElementException : {e}")
+        logging.error(f"NoSuchElementException : {e}")
+        logging.error(f"Error url : {url}")
         return {
             "status": "Failed",
             "error_message": f"Element not found"
         }
     except Exception as e:
-        logging.info(f"Exception : {e}")
+        logging.error(f"Exception : {e}")
+        logging.error(f"Error url : {url}")
         return {
             "status": "Failed",
             "error_message": f"Unexpected error"
@@ -92,12 +106,17 @@ def crawl_url(driver, url):
 
 # 크롤링 결과 A 서버에 전달
 def send_crawl_results(results):
+    logging.info(f"== send_crawl_results ==")
+    driver.switch_to.window(driver.window_handles[1])
+    logging.info(f"Switch tab : {driver.current_url}")
+
     res = {"results":results}
     script = f"""
     return fetch('{A_SERVER_URL}/api/crawl-result', {{
         method: 'POST',
         headers: {{
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'API-Key':'{API_KEY}'
         }},
         body: JSON.stringify({json.dumps(res)})
     }})
@@ -114,15 +133,20 @@ def send_crawl_results(results):
 
 # URL 크롤링 작업
 def crawl_task(driver, crawl_type):
+    logging.info(f"== crawl_task ==")
     logging.info(f"Crawl type : {crawl_type}")
-    icon.icon = create_image(64, 64, "blue", "red")
+    icon.icon = create_image(64, 64, icon_color, "green")
+
+    driver.switch_to.window(driver.window_handles[1])
+    logging.info(f"Switch tab : {driver.current_url}")
 
     try:
         script = f"""
         return fetch('{A_SERVER_URL}/api/url-list?type={crawl_type}',{{
             method: 'GET',
             headers: {{
-                'Content-Type':'application/json'
+                'Content-Type':'application/json',
+                'API-Key':'{API_KEY}'
             }}
         }})
         .then(response => {{
@@ -171,14 +195,19 @@ def crawl_task(driver, crawl_type):
         else:
             logging.info(f"No results to send")
     finally:
-        icon.icon = create_image(64, 64, "blue", "white")
+        icon.icon = create_image(64, 64, icon_color, "white")
 
 def request_generate_product_list(driver):
+    logging.info(f"== request_generate_product_list ==")
+    driver.switch_to.window(driver.window_handles[1])
+    logging.info(f"Switch tab : {driver.current_url}")
+
     script = f"""
     return fetch('{A_SERVER_URL}/api/generate-product-list', {{
         method: 'POST',
         headers: {{
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'API-Key':'{API_KEY}'
         }}
     }})
     .then(response => {{
@@ -204,9 +233,39 @@ def request_generate_product_list(driver):
     except Exception as e:
         logging.error(f"Error while requesting product list generation: {e}")
 
+# ping
+def ping(driver):
+    logging.info(f"== ping ==")
+    driver.switch_to.window(driver.window_handles[1])
+    logging.info(f"Switch tab : {driver.current_url}")
+
+    script = f"""
+    return fetch('{A_SERVER_URL}/api/ping',{{
+        method: 'GET',
+        headers: {{
+            'Content-Type':'application/json'
+        }}
+    }})
+    .then(response => response.status)
+    .catch(() => 500);
+    """
+    response = driver.execute_script(script)
+
+    if response == 200:
+        logging.info(f"ping success")
+        icon.icon = create_image(64, 64, icon_color, "green")
+        time.sleep(1)
+        icon.icon = create_image(64, 64, icon_color, "white")
+    else:
+        logging.error(f"ping failed")
+        icon.icon = create_image(64, 64, icon_color, "red")
+        time.sleep(1)
+        icon.icon = create_image(64, 64, icon_color, "white")
+
 # 크롤링 일정 예약
 def schedule_crawling(driver):
     crawl_time = ["02:00", "08:00", "16:00", "22:00"]
+    logging.info(f"crawl_time : {crawl_time}")
 
     # 2시: active와 pending 크롤링
     schedule.every().day.at(crawl_time[0]).do(crawl_task, driver, crawl_type="all")
@@ -267,6 +326,7 @@ menu = Menu(
         MenuItem("Crawl Retry", lambda icon, item: manual_crawl("retry")),
     )),
     MenuItem("Gen List", lambda icon, item: request_generate_product_list(driver)),
+    MenuItem("Ping", lambda icon, item: ping(driver)),
     MenuItem("Quit", lambda icon, item: quit(icon)),
 )
 
@@ -282,7 +342,7 @@ if __name__ == "__main__":
     # 트레이 아이콘 생성
     icon = Icon(
         "Server B Crawler",
-        icon=create_image(64, 64, "blue", "white"),
+        icon=create_image(64, 64, icon_color, "white"),
         title="Server B",
         menu=menu,
     )
