@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from urllib.parse import urlparse
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, send_from_directory
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
@@ -16,6 +16,7 @@ load_dotenv(dotenv_path)
 app.secret_key = os.getenv('FAMILY_SECRET_KEY')
 app_db_path = os.getenv('FAMILY_DB_PATH')
 app_db_file = os.getenv('FAMILY_DB_FILE')
+# app_db_file = os.getenv('FAMILY_DB_FILE_DEV')
 
 app_db_file_path = os.path.join(app_db_path, app_db_file)
 API_KEY = os.getenv('FAMILY_API_KEY')
@@ -80,18 +81,12 @@ def index():
 
 @app.before_request
 def verify_api_key():
-    # `request.endpoint`가 None인 경우를 처리
-    if not request.endpoint:
-        return
+    protected_endpoints = ['/api/url-list', '/api/crawl-result', '/api/generate-product-list']
 
-    # static 파일 요청 및 일반 사용자 웹 요청은 제외
-    if request.endpoint in ["index", "static"]:
-        return
-
-    # API 요청에만 API 키 검증
-    if request.endpoint.startswith("api"):
+    app.logger.info(f"request.path : {request.path}")
+    if request.path in protected_endpoints:
         api_key = request.headers.get("API-Key")
-        if api_key != API_KEY:
+        if not api_key or api_key != API_KEY:
             return jsonify({"error": "Invalid API Key"}), 403
 
 # URL 상태 확인 API
@@ -162,6 +157,20 @@ def url_status():
         cur.execute("SELECT * FROM product WHERE url_id = ?", (url_row["url_id"],))
         product = cur.fetchone()
 
+        if not product:
+            app.logger.info(f"해당 상품 정보가 없습니다.")
+            conn.close()
+            return jsonify({
+                "status": "inactive",
+                "message": "해당 URL은 3일 이상 데이터 수집이 정상적이지 않아 더 이상 업데이트 되지 않습니다. 이전 데이터만 확인이 가능합니다.",
+                "product_name": None,
+                "prices": [],
+                "image_url": None,
+                "model_name": None,
+                "options": None,
+                "product_url": url_row["url"]
+            })
+
         cur.execute("""
             SELECT date_recorded AS date, release_price, employee_price
             FROM price_history WHERE product_id = ?
@@ -190,6 +199,7 @@ def url_status():
 # URL 데이터 요청 API (날짜 범위)
 @app.route("/api/url-data", methods=["GET"])
 def url_data():
+    app.logger.info(f"== url_data ==")
     url = request.args.get("url")
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
@@ -225,6 +235,7 @@ def url_data():
 # B 서버: URL 리스트 제공
 @app.route("/api/url-list", methods=["GET"])
 def url_list():
+    app.logger.info(f"== url_list ==")
     type_param = request.args.get("type", "all")
     conn = get_db_connection()
     cur = conn.cursor()
@@ -261,6 +272,7 @@ def url_list():
 # B 서버: 크롤링 결과 저장
 @app.route("/api/crawl-result", methods=["POST"])
 def crawl_result():
+    app.logger.info(f"== crawl_result ==")
     results = request.json.get("results", [])
     conn = get_db_connection()
     cur = conn.cursor()
@@ -353,13 +365,25 @@ def crawl_result():
                 
                 # 실패 횟수가 3 이상이고 최근 3일 동안 실패한 경우 inactive 상태로 변경
                 kst_three_days_ago = (datetime.now(KST) - timedelta(days=3)).isoformat(timespec='seconds')
-                cur.execute("""
-                    UPDATE url
-                    SET status = 'inactive'
-                    WHERE url_id = ? AND fail_count >= 3 AND last_attempt <= ?
-                """, (url_id, kst_three_days_ago))
 
-                app.logger.warning(f"URL ID {url_id} 크롤링 실패: {error_message}")
+                # 최근 3번의 실패 기록 조회
+                cur.execute("""
+                    SELECT attempt_time
+                    FROM crawl_log
+                    WHERE url_id = ? AND status = 'Failed'
+                    ORDER BY attempt_time DESC
+                    LIMIT 3
+                """, (url_id,))
+                recent_failures = cur.fetchall()
+
+                # 최근 3번의 실패가 모두 3일 이내인지 확인
+                if len(recent_failures) == 3 and all(failure['attempt_time'] >= kst_three_days_ago for failure in recent_failures):
+                    cur.execute("""
+                        UPDATE url
+                        SET status = 'inactive'
+                        WHERE url_id = ?
+                    """, (url_id,))
+                    app.logger.info(f"URL ID {url_id} 상태를 'inactive'로 변경했습니다. 최근 3일 동안 3번 이상 실패했습니다.")
 
         conn.commit()
     except Exception as e:
@@ -372,6 +396,7 @@ def crawl_result():
 
 # 정적 HTML 생성
 def generate_product_list_html():
+    app.logger.info(f"== generate_product_list_html ==")
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -381,8 +406,8 @@ def generate_product_list_html():
             product.product_name, 
             product.model_name, 
             product.options, 
-            DATE(url.added_date) AS start_date,
-            DATE(url.last_attempt) AS last_date,
+            DATE(DATETIME(url.added_date, 'localtime')) AS start_date,
+            DATE(DATETIME(url.last_attempt, 'localtime')) AS last_date,
             url.status,
             url.url AS product_link
         FROM url
@@ -420,6 +445,7 @@ def generate_product_list_html():
 
 @app.route("/product-list")
 def product_list():
+    app.logger.info(f"== product_list ==")
     file_path = os.path.join("static","product-list", "product-list.html")
     if os.path.exists(file_path):
         return send_file(file_path)
@@ -428,12 +454,22 @@ def product_list():
 
 @app.route("/api/generate-product-list", methods=["POST"])
 def generate_product_list():
+    app.logger.info(f"== generate_product_list ==")
     try:
         generate_product_list_html()
         return jsonify({"status": "success", "message": "Product list generated successfully."}), 200
     except Exception as e:
         app.logger.error(f"Error generating product list: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/ping", methods=["GET"])
+def ping():
+    app.logger.info(f"== ping ==")
+    return jsonify({"status": "success", "message": "connect status ok"}), 200
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory('static', 'favicon.png', mimetype='image/png')
 
 #sample pages for crawling test
 @app.route("/product/sample01")
