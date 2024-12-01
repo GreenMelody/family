@@ -362,28 +362,27 @@ def crawl_result():
                     INSERT INTO crawl_log (url_id, attempt_time, status, error_message)
                     VALUES (?, ?, 'Failed', ?)
                 """, (url_id, get_kst_datetime(), error_message))
-                
-                # 실패 횟수가 3 이상이고 최근 3일 동안 실패한 경우 inactive 상태로 변경
-                kst_three_days_ago = (datetime.now(KST) - timedelta(days=3)).isoformat(timespec='seconds')
 
-                # 최근 3번의 실패 기록 조회
+                # 최근 3일간의 상태 확인
+                kst_three_days_ago = (datetime.now(KST) - timedelta(days=3)).date().isoformat()
                 cur.execute("""
-                    SELECT attempt_time
+                    SELECT DATE(attempt_time) AS crawl_date, MAX(status) AS last_status
                     FROM crawl_log
-                    WHERE url_id = ? AND status = 'Failed'
-                    ORDER BY attempt_time DESC
+                    WHERE url_id = ? AND DATE(attempt_time) >= ?
+                    GROUP BY crawl_date
+                    ORDER BY crawl_date DESC
                     LIMIT 3
-                """, (url_id,))
-                recent_failures = cur.fetchall()
+                """, (url_id, kst_three_days_ago))
+                recent_logs = cur.fetchall()
 
-                # 최근 3번의 실패가 모두 3일 이내인지 확인
-                if len(recent_failures) == 3 and all(failure['attempt_time'] >= kst_three_days_ago for failure in recent_failures):
+                # 3일 연속으로 하루도 성공하지 않은 경우 확인
+                if len(recent_logs) == 3 and all(log["last_status"] == "Failed" for log in recent_logs):
                     cur.execute("""
                         UPDATE url
                         SET status = 'inactive'
                         WHERE url_id = ?
                     """, (url_id,))
-                    app.logger.info(f"URL ID {url_id} 상태를 'inactive'로 변경했습니다. 최근 3일 동안 3번 이상 실패했습니다.")
+                    app.logger.info(f"URL ID {url_id} 상태를 'inactive'로 변경했습니다. 최근 3일 동안 모두 실패했습니다.")
 
         conn.commit()
     except Exception as e:
