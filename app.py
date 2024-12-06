@@ -92,7 +92,9 @@ def verify_api_key():
 # URL 상태 확인 API
 @app.route("/api/url-status", methods=["GET"])
 def url_status():
+    app.logger.info(f"== url_status ==")
     url = request.args.get("url")
+    app.logger.info(f"url : {url}")
     if not url:
         return jsonify({"status": "error", "message": "URL을 입력해주세요."}), 400
 
@@ -101,6 +103,7 @@ def url_status():
         return jsonify({"status": "error", "message": validation_result["message"]}), 400
 
     formatted_url = validation_result["url"]
+    app.logger.info(f"formatted_url : {formatted_url}")
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -110,6 +113,8 @@ def url_status():
     url_row = cur.fetchone()
 
     if not url_row:
+        app.logger.info(f"No url in DB")
+
         # URL이 데이터베이스에 없으면 추가
         cur.execute("""
             INSERT INTO url (url, status, added_date) VALUES (?, 'pending', ?)
@@ -132,8 +137,19 @@ def url_status():
 
     # URL이 이미 데이터베이스에 있는 경우 상태별 처리
     if url_row["status"] == "active":
+        app.logger.info(f"url is exist in DB and status active")
         cur.execute("SELECT * FROM product WHERE url_id = ?", (url_row["url_id"],))
         product = cur.fetchone()
+        if not product:
+            app.logger.info(f"url has no product data. change status from active to pending")
+            cur.execute("UPDATE url SET status = 'pending' WHERE url_id = ?", (url_row["url_id"],))
+            conn.commit()
+            conn.close()
+            return jsonify({
+                "status": "pending",
+                "message": "해당 URL은 데이터 수집 대기 중입니다."
+            })
+
 
         cur.execute("""
             SELECT date_recorded AS date, release_price, employee_price
@@ -154,6 +170,7 @@ def url_status():
             "prices": prices
         })
     elif url_row["status"] == "inactive":
+        app.logger.info(f"url is exist in DB and status inactive")
         cur.execute("SELECT * FROM product WHERE url_id = ?", (url_row["url_id"],))
         product = cur.fetchone()
 
@@ -190,6 +207,7 @@ def url_status():
             "product_url": url_row["url"]
         })
     elif url_row["status"] == "pending":
+        app.logger.info(f"url is in pending")
         conn.close()
         return jsonify({
             "status": "pending",
@@ -237,22 +255,27 @@ def url_data():
 def url_list():
     app.logger.info(f"== url_list ==")
     type_param = request.args.get("type", "all")
+    app.logger.info(f"type_param : {type_param}")
     conn = get_db_connection()
     cur = conn.cursor()
 
     if type_param == "retry":
         # 실패한 URL 가져오기
         cur.execute("""
-            SELECT url_id, url
-            FROM url
-            WHERE status = 'active'
-              AND url_id IN (
-                  SELECT url_id
-                  FROM crawl_log
-                  WHERE status = 'Failed'
-                  GROUP BY url_id
-                  HAVING COUNT(*) >= 1
-              )
+            SELECT u.url_id, u.url
+            FROM url u
+            WHERE u.status = 'active'
+            AND EXISTS (
+                SELECT 1
+                FROM crawl_log cl
+                WHERE cl.url_id = u.url_id
+                    AND cl.status = 'Failed'
+                    AND cl.attempt_time = (
+                        SELECT MAX(cl2.attempt_time)
+                        FROM crawl_log cl2
+                        WHERE cl2.url_id = cl.url_id
+                    )
+            )
         """)
     elif type_param == "pending":
         # Pending 상태의 URL 가져오기
